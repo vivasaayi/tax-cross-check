@@ -95,6 +95,58 @@ type AccountDetails = {
   };
 };
 
+type W2Form = {
+  id: string;
+  employerName: string;
+  employerEin: string;
+  employeeName: string;
+  employeeSsn: string;
+  box1Wages: number;
+  box2FederalWithholding: number;
+  box3SocialSecurityWages: number;
+  box4SocialSecurityTax: number;
+  box5MedicareWages: number;
+  box6MedicareTax: number;
+  box7SocialSecurityTips: number;
+  box8AllocatedTips: number;
+  box10DependentCareBenefits: number;
+  box11NonqualifiedPlans: number;
+  box12aCode: string;
+  box12aAmount: number;
+  box12bCode: string;
+  box12bAmount: number;
+  box12cCode: string;
+  box12cAmount: number;
+  box12dCode: string;
+  box12dAmount: number;
+  box13StatutoryEmployee: boolean;
+  box13RetirementPlan: boolean;
+  box13ThirdPartySickPay: boolean;
+  box14OtherLabel: string;
+  box14OtherAmount: number;
+  box15State: string;
+  box15EmployerStateId: string;
+  box16StateWages: number;
+  box17StateIncomeTax: number;
+  box18LocalWages: number;
+  box19LocalIncomeTax: number;
+  box20LocalityName: string;
+};
+
+type FormSettings = {
+  taxYear: TaxYear;
+  filingStatus: FilingStatus;
+  residentState: StateCode;
+};
+
+type AppSnapshot = {
+  version: 1;
+  formSettings: FormSettings;
+  w2Forms: W2Form[];
+  accounts: string[];
+  accountDetails: Record<string, AccountDetails>;
+};
+
 const currency = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
@@ -138,11 +190,13 @@ app.innerHTML = `
 
     <div class="main-tabs">
       <button type="button" class="main-tab-button active" data-tab="calculator">Tax Calculator</button>
+      <button type="button" class="main-tab-button" data-tab="w2">W-2</button>
       <button type="button" class="main-tab-button" data-tab="accounts">Accounts</button>
       <button type="button" class="main-tab-button" data-tab="interest">Interest</button>
       <button type="button" class="main-tab-button" data-tab="dividends">Dividends</button>
       <button type="button" class="main-tab-button" data-tab="misc">Misc Income</button>
       <button type="button" class="main-tab-button" data-tab="b1099">1099-B Details</button>
+      <button type="button" class="main-tab-button" data-tab="data">Data</button>
     </div>
 
     <div id="calculator-tab" class="main-tab-content active">
@@ -182,17 +236,17 @@ app.innerHTML = `
 
             <label>
               <span>Federal withholding</span>
-              <input name="federalWithholding" type="number" min="0" step="0.01" value="0" />
+              <input name="federalWithholding" type="number" min="0" step="0.01" value="0" readonly />
             </label>
 
             <label>
               <span>State withholding</span>
-              <input name="stateWithholding" type="number" min="0" step="0.01" value="0" />
+              <input name="stateWithholding" type="number" min="0" step="0.01" value="0" readonly />
             </label>
 
             <label>
               <span>W-2 wages</span>
-              <input name="wages" type="number" step="0.01" value="100000" />
+              <input name="wages" type="number" step="0.01" value="0" readonly />
             </label>
 
             <label>
@@ -241,6 +295,29 @@ app.innerHTML = `
             Enter your numbers and run the estimate.
           </div>
         </section>
+      </section>
+    </div>
+
+    <div id="w2-tab" class="main-tab-content">
+      <section class="panel w2-panel">
+        <div class="form-header">
+          <h2>W-2 Forms</h2>
+          <p>Enter each W-2 in full. Box 1 wages, box 2 federal withholding, and box 17 state income tax flow into the estimate automatically.</p>
+        </div>
+
+        <div class="w2-summary" id="w2-summary">
+          <div><span>W-2 wages</span><strong id="w2-wages-total">0.00</strong></div>
+          <div><span>Federal withholding</span><strong id="w2-federal-total">0.00</strong></div>
+          <div><span>State withholding</span><strong id="w2-state-total">0.00</strong></div>
+        </div>
+
+        <div class="actions">
+          <button type="button" id="add-w2-btn">Add W-2</button>
+        </div>
+
+        <div id="w2-forms" class="w2-forms">
+          <!-- W-2 cards will be added dynamically -->
+        </div>
       </section>
     </div>
 
@@ -514,6 +591,22 @@ app.innerHTML = `
         </div>
       </section>
     </div>
+
+    <div id="data-tab" class="main-tab-content">
+      <section class="panel data-panel">
+        <div class="form-header">
+          <h2>Data</h2>
+          <p>Use Save to export your data to a JSON file. Use Open to import from a JSON file.</p>
+        </div>
+
+        <div class="actions">
+          <button type="button" id="export-json-btn">Save</button>
+          <button type="button" id="import-json-btn">Open</button>
+        </div>
+
+        <p id="data-status" class="microcopy">Data is not auto-saved. Use Save/Open for persistence.</p>
+      </section>
+    </div>
   </main>
 `;
 
@@ -530,6 +623,9 @@ const taxableInterestInput = form.querySelector<HTMLInputElement>('input[name="t
 const ordinaryDividendsInput = form.querySelector<HTMLInputElement>('input[name="ordinaryDividends"]');
 const qualifiedDividendsInput = form.querySelector<HTMLInputElement>('input[name="qualifiedDividends"]');
 const miscIncomeInput = form.querySelector<HTMLInputElement>('input[name="miscIncome"]');
+const wagesInput = form.querySelector<HTMLInputElement>('input[name="wages"]');
+const federalWithholdingInput = form.querySelector<HTMLInputElement>('input[name="federalWithholding"]');
+const stateWithholdingInput = form.querySelector<HTMLInputElement>('input[name="stateWithholding"]');
 
 if (
   !shortTermGainsInput
@@ -538,12 +634,13 @@ if (
   || !ordinaryDividendsInput
   || !qualifiedDividendsInput
   || !miscIncomeInput
+  || !wagesInput
+  || !federalWithholdingInput
+  || !stateWithholdingInput
 ) {
   throw new Error("Required summary inputs are missing.");
 }
 
-const accountsStorageKey = "tax-cross-check.accounts";
-const accountDetailsStorageKey = "tax-cross-check.account-details";
 const b1099Configs = [
   { key: "shortCovered", tabId: "short-covered", term: "short", label: "Short-Term Covered" },
   { key: "shortNoncovered", tabId: "short-noncovered", term: "short", label: "Short-Term Noncovered" },
@@ -613,6 +710,44 @@ const createEmptyAccountDetails = (): AccountDetails => ({
   },
 });
 
+const createEmptyW2Form = (): W2Form => ({
+  id: crypto.randomUUID(),
+  employerName: "",
+  employerEin: "",
+  employeeName: "",
+  employeeSsn: "",
+  box1Wages: 0,
+  box2FederalWithholding: 0,
+  box3SocialSecurityWages: 0,
+  box4SocialSecurityTax: 0,
+  box5MedicareWages: 0,
+  box6MedicareTax: 0,
+  box7SocialSecurityTips: 0,
+  box8AllocatedTips: 0,
+  box10DependentCareBenefits: 0,
+  box11NonqualifiedPlans: 0,
+  box12aCode: "",
+  box12aAmount: 0,
+  box12bCode: "",
+  box12bAmount: 0,
+  box12cCode: "",
+  box12cAmount: 0,
+  box12dCode: "",
+  box12dAmount: 0,
+  box13StatutoryEmployee: false,
+  box13RetirementPlan: false,
+  box13ThirdPartySickPay: false,
+  box14OtherLabel: "",
+  box14OtherAmount: 0,
+  box15State: "",
+  box15EmployerStateId: "",
+  box16StateWages: 0,
+  box17StateIncomeTax: 0,
+  box18LocalWages: 0,
+  box19LocalIncomeTax: 0,
+  box20LocalityName: "",
+});
+
 function normalizeB1099Entry(value: unknown): B1099Entry {
   const entry = (value ?? {}) as Partial<B1099Entry>;
   return {
@@ -667,6 +802,106 @@ function normalizeAccountDetails(value: unknown): AccountDetails {
   };
 }
 
+function normalizeW2Form(value: unknown): W2Form {
+  const entry = (value ?? {}) as Partial<W2Form>;
+  return {
+    id: typeof entry.id === 'string' && entry.id ? entry.id : crypto.randomUUID(),
+    employerName: String(entry.employerName ?? ''),
+    employerEin: String(entry.employerEin ?? ''),
+    employeeName: String(entry.employeeName ?? ''),
+    employeeSsn: String(entry.employeeSsn ?? ''),
+    box1Wages: readStoredNumber(entry.box1Wages),
+    box2FederalWithholding: readStoredNumber(entry.box2FederalWithholding),
+    box3SocialSecurityWages: readStoredNumber(entry.box3SocialSecurityWages),
+    box4SocialSecurityTax: readStoredNumber(entry.box4SocialSecurityTax),
+    box5MedicareWages: readStoredNumber(entry.box5MedicareWages),
+    box6MedicareTax: readStoredNumber(entry.box6MedicareTax),
+    box7SocialSecurityTips: readStoredNumber(entry.box7SocialSecurityTips),
+    box8AllocatedTips: readStoredNumber(entry.box8AllocatedTips),
+    box10DependentCareBenefits: readStoredNumber(entry.box10DependentCareBenefits),
+    box11NonqualifiedPlans: readStoredNumber(entry.box11NonqualifiedPlans),
+    box12aCode: String(entry.box12aCode ?? ''),
+    box12aAmount: readStoredNumber(entry.box12aAmount),
+    box12bCode: String(entry.box12bCode ?? ''),
+    box12bAmount: readStoredNumber(entry.box12bAmount),
+    box12cCode: String(entry.box12cCode ?? ''),
+    box12cAmount: readStoredNumber(entry.box12cAmount),
+    box12dCode: String(entry.box12dCode ?? ''),
+    box12dAmount: readStoredNumber(entry.box12dAmount),
+    box13StatutoryEmployee: Boolean(entry.box13StatutoryEmployee),
+    box13RetirementPlan: Boolean(entry.box13RetirementPlan),
+    box13ThirdPartySickPay: Boolean(entry.box13ThirdPartySickPay),
+    box14OtherLabel: String(entry.box14OtherLabel ?? ''),
+    box14OtherAmount: readStoredNumber(entry.box14OtherAmount),
+    box15State: String(entry.box15State ?? ''),
+    box15EmployerStateId: String(entry.box15EmployerStateId ?? ''),
+    box16StateWages: readStoredNumber(entry.box16StateWages),
+    box17StateIncomeTax: readStoredNumber(entry.box17StateIncomeTax),
+    box18LocalWages: readStoredNumber(entry.box18LocalWages),
+    box19LocalIncomeTax: readStoredNumber(entry.box19LocalIncomeTax),
+    box20LocalityName: String(entry.box20LocalityName ?? ''),
+  };
+}
+
+function readFormSettings(): FormSettings {
+  const safeForm = form!;
+  const taxYearField = safeForm.elements.namedItem('taxYear');
+  const filingStatusField = safeForm.elements.namedItem('filingStatus');
+  const residentStateField = safeForm.elements.namedItem('residentState');
+
+  return {
+    taxYear: String(taxYearField instanceof HTMLSelectElement ? taxYearField.value : 'y2024') as TaxYear,
+    filingStatus: String(filingStatusField instanceof HTMLSelectElement ? filingStatusField.value : 'single') as FilingStatus,
+    residentState: String(residentStateField instanceof HTMLSelectElement ? residentStateField.value : 'nj') as StateCode,
+  };
+}
+
+function applyFormSettings(settings: FormSettings) {
+  const safeForm = form!;
+  const taxYearSelect = safeForm.elements.namedItem('taxYear');
+  const filingStatusSelect = safeForm.elements.namedItem('filingStatus');
+  const residentStateSelect = safeForm.elements.namedItem('residentState');
+
+  if (taxYearSelect instanceof HTMLSelectElement) {
+    taxYearSelect.value = settings.taxYear;
+  }
+  if (filingStatusSelect instanceof HTMLSelectElement) {
+    filingStatusSelect.value = settings.filingStatus;
+  }
+  if (residentStateSelect instanceof HTMLSelectElement) {
+    residentStateSelect.value = settings.residentState;
+  }
+}
+
+function buildSnapshot(): AppSnapshot {
+  return {
+    version: 1,
+    formSettings: readFormSettings(),
+    w2Forms,
+    accounts,
+    accountDetails,
+  };
+}
+
+function normalizeSnapshot(value: unknown): AppSnapshot {
+  const snapshot = (value ?? {}) as Partial<AppSnapshot>;
+  return {
+    version: 1,
+    formSettings: {
+      taxYear: String(snapshot.formSettings?.taxYear ?? 'y2024') as TaxYear,
+      filingStatus: String(snapshot.formSettings?.filingStatus ?? 'single') as FilingStatus,
+      residentState: String(snapshot.formSettings?.residentState ?? 'nj') as StateCode,
+    },
+    w2Forms: Array.isArray(snapshot.w2Forms) ? snapshot.w2Forms.map((entry) => normalizeW2Form(entry)) : [],
+    accounts: Array.isArray(snapshot.accounts)
+      ? snapshot.accounts.map((value) => String(value).trim()).filter((value, index, values) => value.length > 0 && values.indexOf(value) === index)
+      : [],
+    accountDetails: snapshot.accountDetails && typeof snapshot.accountDetails === 'object'
+      ? Object.fromEntries(Object.entries(snapshot.accountDetails).map(([accountName, entry]) => [accountName, normalizeAccountDetails(entry)]))
+      : {},
+  };
+}
+
 function getB1099Config(category: B1099Category) {
   return b1099Configs.find((config) => config.key === category)!;
 }
@@ -704,6 +939,207 @@ document.querySelectorAll('.tab-button').forEach(button => {
   });
 });
 
+const w2FormsContainer = document.getElementById('w2-forms') as HTMLElement;
+const addW2Btn = document.getElementById('add-w2-btn') as HTMLButtonElement;
+const exportJsonBtn = document.getElementById('export-json-btn') as HTMLButtonElement;
+const importJsonBtn = document.getElementById('import-json-btn') as HTMLButtonElement;
+const dataStatus = document.getElementById('data-status') as HTMLParagraphElement;
+
+let w2Forms: W2Form[] = [];
+
+function setDataStatus(message: string, isError = false) {
+  dataStatus.textContent = message;
+  dataStatus.classList.toggle('data-error', isError);
+}
+
+function updateW2SummaryInputs() {
+  let wages = 0;
+  let federalWithholding = 0;
+  let stateWithholding = 0;
+
+  w2Forms.forEach((entry) => {
+    wages += entry.box1Wages;
+    federalWithholding += entry.box2FederalWithholding;
+    stateWithholding += entry.box17StateIncomeTax;
+  });
+
+  setTextContent('w2-wages-total', wages);
+  setTextContent('w2-federal-total', federalWithholding);
+  setTextContent('w2-state-total', stateWithholding);
+  wagesInput!.value = wages.toFixed(2);
+  federalWithholdingInput!.value = federalWithholding.toFixed(2);
+  stateWithholdingInput!.value = stateWithholding.toFixed(2);
+}
+
+function removeW2Form(id: string) {
+  w2Forms = w2Forms.filter((entry) => entry.id !== id);
+  renderW2Forms();
+  updateW2SummaryInputs();
+}
+
+function renderW2Forms() {
+  w2FormsContainer.innerHTML = '';
+
+  if (w2Forms.length === 0) {
+    const emptyState = document.createElement('div');
+    emptyState.className = 'empty-card';
+    emptyState.textContent = 'Add a W-2 to start capturing box-level payroll detail.';
+    w2FormsContainer.appendChild(emptyState);
+    return;
+  }
+
+  w2Forms.forEach((entry, index) => {
+    const card = document.createElement('article');
+    card.className = 'w2-card';
+    card.innerHTML = `
+      <div class="w2-card-header">
+        <div>
+          <h3>W-2 ${index + 1}</h3>
+          <p>Employer and box-level detail for one W-2.</p>
+        </div>
+        <button type="button" class="danger-button" data-remove-w2="${entry.id}">Remove</button>
+      </div>
+
+      <div class="w2-grid">
+        <label><span>Employer name</span><input type="text" data-string-field="employerName" value="${entry.employerName}" /></label>
+        <label><span>Employer EIN</span><input type="text" data-string-field="employerEin" value="${entry.employerEin}" /></label>
+        <label><span>Employee name</span><input type="text" data-string-field="employeeName" value="${entry.employeeName}" /></label>
+        <label><span>Employee SSN</span><input type="text" data-string-field="employeeSsn" value="${entry.employeeSsn}" /></label>
+
+        <label><span>Box 1 Wages, tips, other comp</span><input type="number" step="0.01" data-number-field="box1Wages" value="${formatInputValue(entry.box1Wages)}" /></label>
+        <label><span>Box 2 Federal income tax withheld</span><input type="number" step="0.01" data-number-field="box2FederalWithholding" value="${formatInputValue(entry.box2FederalWithholding)}" /></label>
+        <label><span>Box 3 Social Security wages</span><input type="number" step="0.01" data-number-field="box3SocialSecurityWages" value="${formatInputValue(entry.box3SocialSecurityWages)}" /></label>
+        <label><span>Box 4 Social Security tax withheld</span><input type="number" step="0.01" data-number-field="box4SocialSecurityTax" value="${formatInputValue(entry.box4SocialSecurityTax)}" /></label>
+        <label><span>Box 5 Medicare wages and tips</span><input type="number" step="0.01" data-number-field="box5MedicareWages" value="${formatInputValue(entry.box5MedicareWages)}" /></label>
+        <label><span>Box 6 Medicare tax withheld</span><input type="number" step="0.01" data-number-field="box6MedicareTax" value="${formatInputValue(entry.box6MedicareTax)}" /></label>
+        <label><span>Box 7 Social Security tips</span><input type="number" step="0.01" data-number-field="box7SocialSecurityTips" value="${formatInputValue(entry.box7SocialSecurityTips)}" /></label>
+        <label><span>Box 8 Allocated tips</span><input type="number" step="0.01" data-number-field="box8AllocatedTips" value="${formatInputValue(entry.box8AllocatedTips)}" /></label>
+        <label><span>Box 10 Dependent care benefits</span><input type="number" step="0.01" data-number-field="box10DependentCareBenefits" value="${formatInputValue(entry.box10DependentCareBenefits)}" /></label>
+        <label><span>Box 11 Nonqualified plans</span><input type="number" step="0.01" data-number-field="box11NonqualifiedPlans" value="${formatInputValue(entry.box11NonqualifiedPlans)}" /></label>
+
+        <label><span>Box 12a code</span><input type="text" data-string-field="box12aCode" value="${entry.box12aCode}" /></label>
+        <label><span>Box 12a amount</span><input type="number" step="0.01" data-number-field="box12aAmount" value="${formatInputValue(entry.box12aAmount)}" /></label>
+        <label><span>Box 12b code</span><input type="text" data-string-field="box12bCode" value="${entry.box12bCode}" /></label>
+        <label><span>Box 12b amount</span><input type="number" step="0.01" data-number-field="box12bAmount" value="${formatInputValue(entry.box12bAmount)}" /></label>
+        <label><span>Box 12c code</span><input type="text" data-string-field="box12cCode" value="${entry.box12cCode}" /></label>
+        <label><span>Box 12c amount</span><input type="number" step="0.01" data-number-field="box12cAmount" value="${formatInputValue(entry.box12cAmount)}" /></label>
+        <label><span>Box 12d code</span><input type="text" data-string-field="box12dCode" value="${entry.box12dCode}" /></label>
+        <label><span>Box 12d amount</span><input type="number" step="0.01" data-number-field="box12dAmount" value="${formatInputValue(entry.box12dAmount)}" /></label>
+
+        <label class="checkbox-field"><input type="checkbox" data-boolean-field="box13StatutoryEmployee" ${entry.box13StatutoryEmployee ? 'checked' : ''} /><span>Box 13 Statutory employee</span></label>
+        <label class="checkbox-field"><input type="checkbox" data-boolean-field="box13RetirementPlan" ${entry.box13RetirementPlan ? 'checked' : ''} /><span>Box 13 Retirement plan</span></label>
+        <label class="checkbox-field"><input type="checkbox" data-boolean-field="box13ThirdPartySickPay" ${entry.box13ThirdPartySickPay ? 'checked' : ''} /><span>Box 13 Third-party sick pay</span></label>
+        <div></div>
+
+        <label><span>Box 14 other label</span><input type="text" data-string-field="box14OtherLabel" value="${entry.box14OtherLabel}" /></label>
+        <label><span>Box 14 other amount</span><input type="number" step="0.01" data-number-field="box14OtherAmount" value="${formatInputValue(entry.box14OtherAmount)}" /></label>
+        <label><span>Box 15 state</span><input type="text" data-string-field="box15State" value="${entry.box15State}" /></label>
+        <label><span>Box 15 employer state ID</span><input type="text" data-string-field="box15EmployerStateId" value="${entry.box15EmployerStateId}" /></label>
+        <label><span>Box 16 state wages</span><input type="number" step="0.01" data-number-field="box16StateWages" value="${formatInputValue(entry.box16StateWages)}" /></label>
+        <label><span>Box 17 state income tax</span><input type="number" step="0.01" data-number-field="box17StateIncomeTax" value="${formatInputValue(entry.box17StateIncomeTax)}" /></label>
+        <label><span>Box 18 local wages</span><input type="number" step="0.01" data-number-field="box18LocalWages" value="${formatInputValue(entry.box18LocalWages)}" /></label>
+        <label><span>Box 19 local income tax</span><input type="number" step="0.01" data-number-field="box19LocalIncomeTax" value="${formatInputValue(entry.box19LocalIncomeTax)}" /></label>
+        <label><span>Box 20 locality name</span><input type="text" data-string-field="box20LocalityName" value="${entry.box20LocalityName}" /></label>
+      </div>
+    `;
+
+    card.querySelector('[data-remove-w2]')?.addEventListener('click', () => removeW2Form(entry.id));
+
+    card.querySelectorAll<HTMLInputElement>('input[data-string-field]').forEach((input) => {
+      input.addEventListener('input', () => {
+        const field = input.dataset.stringField as keyof W2Form;
+        const target = w2Forms.find((item) => item.id === entry.id);
+        if (!target) {
+          return;
+        }
+        (target[field] as string) = input.value;
+      });
+    });
+
+    card.querySelectorAll<HTMLInputElement>('input[data-number-field]').forEach((input) => {
+      input.addEventListener('input', () => {
+        const field = input.dataset.numberField as keyof W2Form;
+        const target = w2Forms.find((item) => item.id === entry.id);
+        if (!target) {
+          return;
+        }
+        (target[field] as number) = readStoredNumber(input.value);
+        updateW2SummaryInputs();
+      });
+    });
+
+    card.querySelectorAll<HTMLInputElement>('input[data-boolean-field]').forEach((input) => {
+      input.addEventListener('change', () => {
+        const field = input.dataset.booleanField as keyof W2Form;
+        const target = w2Forms.find((item) => item.id === entry.id);
+        if (!target) {
+          return;
+        }
+        (target[field] as boolean) = input.checked;
+      });
+    });
+
+    w2FormsContainer.appendChild(card);
+  });
+}
+
+function addW2Form() {
+  w2Forms.push(createEmptyW2Form());
+  renderW2Forms();
+  updateW2SummaryInputs();
+}
+
+function applySnapshot(snapshot: AppSnapshot) {
+  applyFormSettings(snapshot.formSettings);
+  w2Forms = snapshot.w2Forms.map((entry) => normalizeW2Form(entry));
+  accounts = snapshot.accounts;
+  accountDetails = snapshot.accountDetails;
+  syncStateWithAccounts();
+  renderW2Forms();
+  renderAccounts();
+  syncAccountTables();
+  updateW2SummaryInputs();
+  form!.requestSubmit();
+}
+
+async function exportSnapshot() {
+  try {
+    const suggestedFileName = `tax-cross-check-${new Date().toISOString().slice(0, 10)}.json`;
+    const savedPath = await invoke<string | null>('save_export_json', {
+      contents: JSON.stringify(buildSnapshot(), null, 2),
+      suggestedFileName,
+    });
+
+    if (!savedPath) {
+      setDataStatus('Export canceled.');
+      return;
+    }
+
+    setDataStatus(`Exported JSON to ${savedPath}.`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    setDataStatus(`Unable to export JSON: ${message}`, true);
+  }
+}
+
+async function importSnapshot() {
+  try {
+    const contents = await invoke<string | null>('open_import_json');
+    if (!contents) {
+      setDataStatus('Import canceled.');
+      return;
+    }
+
+    const parsed = JSON.parse(contents);
+    const snapshot = normalizeSnapshot(parsed);
+    applySnapshot(snapshot);
+    setDataStatus('Imported JSON snapshot successfully.');
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    setDataStatus(`Unable to import JSON: ${message}`, true);
+  }
+}
+
 // Account management
 const accountsList = document.getElementById('accounts-list') as HTMLElement;
 const newAccountInput = document.getElementById('new-account-name') as HTMLInputElement;
@@ -711,54 +1147,6 @@ const addAccountBtn = document.getElementById('add-account-btn') as HTMLButtonEl
 
 let accounts: string[] = [];
 let accountDetails: Record<string, AccountDetails> = {};
-
-function saveAccounts() {
-  window.localStorage.setItem(accountsStorageKey, JSON.stringify(accounts));
-}
-
-function saveAccountDetails() {
-  window.localStorage.setItem(accountDetailsStorageKey, JSON.stringify(accountDetails));
-}
-
-function loadAccounts(): string[] {
-  const stored = window.localStorage.getItem(accountsStorageKey);
-  if (!stored) {
-    return [];
-  }
-
-  try {
-    const parsed = JSON.parse(stored);
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed
-      .map((value) => String(value).trim())
-      .filter((value, index, values) => value.length > 0 && values.indexOf(value) === index);
-  } catch {
-    return [];
-  }
-}
-
-function loadAccountDetails(): Record<string, AccountDetails> {
-  const stored = window.localStorage.getItem(accountDetailsStorageKey);
-  if (!stored) {
-    return {};
-  }
-
-  try {
-    const parsed = JSON.parse(stored);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      return {};
-    }
-
-    return Object.fromEntries(
-      Object.entries(parsed).map(([accountName, value]) => [accountName, normalizeAccountDetails(value)]),
-    );
-  } catch {
-    return {};
-  }
-}
 
 function syncStateWithAccounts() {
   const nextDetails: Record<string, AccountDetails> = {};
@@ -968,7 +1356,6 @@ function renderInterestRows() {
         const field = input.dataset.field as keyof IntEntry;
         getAccountDetails(accountName).interest[field] = readStoredNumber(input.value);
         updateInterestTotals();
-        saveAccountDetails();
       });
     });
 
@@ -1005,7 +1392,6 @@ function renderDividendsRows() {
         const field = input.dataset.field as keyof DivEntry;
         getAccountDetails(accountName).dividends[field] = readStoredNumber(input.value);
         updateDividendsTotals();
-        saveAccountDetails();
       });
     });
 
@@ -1033,7 +1419,6 @@ function renderMiscRows() {
       const input = event.currentTarget as HTMLInputElement;
       getAccountDetails(accountName).miscIncome = readStoredNumber(input.value);
       updateMiscTotal();
-      saveAccountDetails();
     });
 
     tbody.appendChild(row);
@@ -1082,7 +1467,6 @@ function renderB1099Rows(category: B1099Category) {
         getAccountDetails(accountName).b1099[category][field] = readStoredNumber(input.value);
         applyB1099RowState(row, getAccountDetails(accountName).b1099[category]);
         updateB1099SummaryInputs();
-        saveAccountDetails();
       });
     });
 
@@ -1127,8 +1511,6 @@ function addAccount(name: string) {
   accounts.push(trimmedName);
   renderAccounts();
   syncAccountTables();
-  saveAccounts();
-  saveAccountDetails();
   newAccountInput.value = '';
 }
 
@@ -1141,10 +1523,9 @@ function removeAccount(index: number) {
   accounts.splice(index, 1);
   renderAccounts();
   syncAccountTables();
-  saveAccounts();
-  saveAccountDetails();
 }
 
+addW2Btn.addEventListener('click', addW2Form);
 addAccountBtn.addEventListener('click', () => addAccount(newAccountInput.value));
 newAccountInput.addEventListener('keypress', (e) => {
   if (e.key === 'Enter') {
@@ -1153,9 +1534,15 @@ newAccountInput.addEventListener('keypress', (e) => {
   }
 });
 
-accounts = loadAccounts();
-accountDetails = loadAccountDetails();
+exportJsonBtn.addEventListener('click', () => {
+  void exportSnapshot();
+});
+importJsonBtn.addEventListener('click', () => {
+  void importSnapshot();
+});
+
 syncStateWithAccounts();
+renderW2Forms();
 renderAccounts();
 syncAccountTables();
 
@@ -1164,6 +1551,8 @@ updateInterestTotals();
 updateDividendsTotals();
 updateMiscTotal();
 updateB1099SummaryInputs();
+updateW2SummaryInputs();
+setDataStatus('Data is not auto-saved. Use Save/Open for persistence.');
 
 const readNumber = (value: FormDataEntryValue | null): number => {
   const parsed = Number(value ?? 0);

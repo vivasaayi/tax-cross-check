@@ -83,6 +83,7 @@ pub fn calculate(input: &TaxCalculationInput) -> Result<TaxCalculationResult, St
             "Qualified dividends are capped at ordinary dividends and long-term gains use simplified preferential federal rates.".into(),
             format!("{state_name} estimate assumes a resident return and does not handle multi-state allocation or local taxes."),
             "NJ estimate omits personal exemptions and other state-specific adjustments; NY estimate uses standard deduction only.".into(),
+            "W-2 wages and withholding totals are summed from the detailed W-2 tab entries.".into(),
             "1099-B gains/losses are summed from short-term covered, short-term noncovered, long-term covered, and long-term noncovered account details.".into(),
             "Additional 1099-INT and 1099-DIV boxes are collected for reconciliation, but this simplified estimate currently uses taxable interest and ordinary/qualified dividends for the tax calculation.".into(),
             "This tool is intended for cross-checking summary totals, not preparing a tax filing.".into(),
