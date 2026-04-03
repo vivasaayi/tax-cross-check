@@ -147,6 +147,11 @@ type AppSnapshot = {
   accountDetails: Record<string, AccountDetails>;
 };
 
+type OpenSnapshotResult = {
+  path: string;
+  contents: string;
+};
+
 const currency = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
@@ -167,6 +172,20 @@ if (!app) {
 
 app.innerHTML = `
   <main class="shell">
+    <div id="startup-gate" class="startup-gate active">
+      <section class="startup-card">
+        <p class="eyebrow">Document Workflow</p>
+        <h2>Open an existing tax file or start a new one</h2>
+        <p class="lede">
+          Work with one JSON file at a time. Open once, save repeatedly to the same file, or use Save As to create a copy.
+        </p>
+        <div class="startup-actions">
+          <button type="button" id="startup-open-btn">Open File</button>
+          <button type="button" id="startup-new-btn" class="secondary-button">New File</button>
+        </div>
+      </section>
+    </div>
+
     <section class="hero">
       <div>
         <p class="eyebrow">Rust + Tauri</p>
@@ -188,6 +207,21 @@ app.innerHTML = `
       </div>
     </section>
 
+    <section class="document-bar panel">
+      <div class="document-meta">
+        <p class="eyebrow">Current File</p>
+        <h2 id="document-name">No file open</h2>
+        <p id="document-path" class="document-path">Choose Open File or New File to begin.</p>
+      </div>
+      <div class="document-actions">
+        <button type="button" id="new-file-btn" class="secondary-button">New</button>
+        <button type="button" id="open-file-btn" class="secondary-button">Open</button>
+        <button type="button" id="save-file-btn">Save</button>
+        <button type="button" id="save-as-file-btn" class="secondary-button">Save As</button>
+      </div>
+      <p id="data-status" class="microcopy">Open an existing file or create a new one.</p>
+    </section>
+
     <div class="main-tabs">
       <button type="button" class="main-tab-button active" data-tab="calculator">Tax Calculator</button>
       <button type="button" class="main-tab-button" data-tab="w2">W-2</button>
@@ -196,7 +230,6 @@ app.innerHTML = `
       <button type="button" class="main-tab-button" data-tab="dividends">Dividends</button>
       <button type="button" class="main-tab-button" data-tab="misc">Misc Income</button>
       <button type="button" class="main-tab-button" data-tab="b1099">1099-B Details</button>
-      <button type="button" class="main-tab-button" data-tab="data">Data</button>
     </div>
 
     <div id="calculator-tab" class="main-tab-content active">
@@ -592,21 +625,6 @@ app.innerHTML = `
       </section>
     </div>
 
-    <div id="data-tab" class="main-tab-content">
-      <section class="panel data-panel">
-        <div class="form-header">
-          <h2>Data</h2>
-          <p>Use Save to export your data to a JSON file. Use Open to import from a JSON file.</p>
-        </div>
-
-        <div class="actions">
-          <button type="button" id="export-json-btn">Save</button>
-          <button type="button" id="import-json-btn">Open</button>
-        </div>
-
-        <p id="data-status" class="microcopy">Data is not auto-saved. Use Save/Open for persistence.</p>
-      </section>
-    </div>
   </main>
 `;
 
@@ -941,11 +959,87 @@ document.querySelectorAll('.tab-button').forEach(button => {
 
 const w2FormsContainer = document.getElementById('w2-forms') as HTMLElement;
 const addW2Btn = document.getElementById('add-w2-btn') as HTMLButtonElement;
-const exportJsonBtn = document.getElementById('export-json-btn') as HTMLButtonElement;
-const importJsonBtn = document.getElementById('import-json-btn') as HTMLButtonElement;
+const startupGate = document.getElementById('startup-gate') as HTMLDivElement;
+const startupOpenBtn = document.getElementById('startup-open-btn') as HTMLButtonElement;
+const startupNewBtn = document.getElementById('startup-new-btn') as HTMLButtonElement;
+const newFileBtn = document.getElementById('new-file-btn') as HTMLButtonElement;
+const openFileBtn = document.getElementById('open-file-btn') as HTMLButtonElement;
+const saveFileBtn = document.getElementById('save-file-btn') as HTMLButtonElement;
+const saveAsFileBtn = document.getElementById('save-as-file-btn') as HTMLButtonElement;
+const documentName = document.getElementById('document-name') as HTMLHeadingElement;
+const documentPath = document.getElementById('document-path') as HTMLParagraphElement;
 const dataStatus = document.getElementById('data-status') as HTMLParagraphElement;
 
 let w2Forms: W2Form[] = [];
+let currentFilePath: string | null = null;
+let hasUnsavedChanges = false;
+let sessionStarted = false;
+
+function buildEmptySnapshot(): AppSnapshot {
+  return {
+    version: 1,
+    formSettings: {
+      taxYear: 'y2024',
+      filingStatus: 'single',
+      residentState: 'nj',
+    },
+    w2Forms: [],
+    accounts: [],
+    accountDetails: {},
+  };
+}
+
+function getFileName(filePath: string | null): string {
+  if (!filePath) {
+    return 'Untitled';
+  }
+
+  return filePath.split(/[/\\]/).pop() || filePath;
+}
+
+function updateDocumentChrome() {
+  const baseName = sessionStarted ? getFileName(currentFilePath) : 'No file open';
+  documentName.textContent = sessionStarted && hasUnsavedChanges ? `${baseName} *` : baseName;
+  documentPath.textContent = !sessionStarted
+    ? 'Choose Open File or New File to begin.'
+    : currentFilePath ?? 'New unsaved file';
+  saveFileBtn.disabled = !sessionStarted;
+  saveAsFileBtn.disabled = !sessionStarted;
+}
+
+function markDirty() {
+  if (!sessionStarted) {
+    return;
+  }
+
+  hasUnsavedChanges = true;
+  updateDocumentChrome();
+}
+
+function markSaved(savedPath?: string | null) {
+  if (savedPath) {
+    currentFilePath = savedPath;
+  }
+
+  hasUnsavedChanges = false;
+  sessionStarted = true;
+  startupGate.classList.remove('active');
+  updateDocumentChrome();
+}
+
+function beginSession() {
+  sessionStarted = true;
+  startupGate.classList.remove('active');
+  updateDocumentChrome();
+}
+
+function confirmDiscardChanges(actionLabel: string): boolean {
+  if (!sessionStarted || !hasUnsavedChanges) {
+    return true;
+  }
+
+  return window.confirm(`You have unsaved changes. ${actionLabel} and discard them?`);
+}
 
 function setDataStatus(message: string, isError = false) {
   dataStatus.textContent = message;
@@ -975,6 +1069,7 @@ function removeW2Form(id: string) {
   w2Forms = w2Forms.filter((entry) => entry.id !== id);
   renderW2Forms();
   updateW2SummaryInputs();
+  markDirty();
 }
 
 function renderW2Forms() {
@@ -1053,6 +1148,7 @@ function renderW2Forms() {
           return;
         }
         (target[field] as string) = input.value;
+        markDirty();
       });
     });
 
@@ -1065,6 +1161,7 @@ function renderW2Forms() {
         }
         (target[field] as number) = readStoredNumber(input.value);
         updateW2SummaryInputs();
+        markDirty();
       });
     });
 
@@ -1076,6 +1173,7 @@ function renderW2Forms() {
           return;
         }
         (target[field] as boolean) = input.checked;
+        markDirty();
       });
     });
 
@@ -1087,6 +1185,7 @@ function addW2Form() {
   w2Forms.push(createEmptyW2Form());
   renderW2Forms();
   updateW2SummaryInputs();
+  markDirty();
 }
 
 function applySnapshot(snapshot: AppSnapshot) {
@@ -1102,42 +1201,77 @@ function applySnapshot(snapshot: AppSnapshot) {
   form!.requestSubmit();
 }
 
-async function exportSnapshot() {
+async function saveSnapshotAs() {
   try {
-    const suggestedFileName = `tax-cross-check-${new Date().toISOString().slice(0, 10)}.json`;
+    const suggestedFileName = currentFilePath
+      ? getFileName(currentFilePath)
+      : `tax-cross-check-${new Date().toISOString().slice(0, 10)}.json`;
     const savedPath = await invoke<string | null>('save_export_json', {
       contents: JSON.stringify(buildSnapshot(), null, 2),
       suggestedFileName,
+      currentFilePath,
     });
 
     if (!savedPath) {
-      setDataStatus('Export canceled.');
+      setDataStatus('Save As canceled.');
       return;
     }
 
-    setDataStatus(`Exported JSON to ${savedPath}.`);
+    markSaved(savedPath);
+    setDataStatus(`Saved ${getFileName(savedPath)}.`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    setDataStatus(`Unable to export JSON: ${message}`, true);
+    setDataStatus(`Unable to save file: ${message}`, true);
   }
 }
 
-async function importSnapshot() {
+async function saveSnapshot() {
   try {
-    const contents = await invoke<string | null>('open_import_json');
-    if (!contents) {
-      setDataStatus('Import canceled.');
+    if (!currentFilePath) {
+      await saveSnapshotAs();
       return;
     }
 
-    const parsed = JSON.parse(contents);
-    const snapshot = normalizeSnapshot(parsed);
-    applySnapshot(snapshot);
-    setDataStatus('Imported JSON snapshot successfully.');
+    const savedPath = await invoke<string>('save_snapshot_to_path', {
+      path: currentFilePath,
+      contents: JSON.stringify(buildSnapshot(), null, 2),
+    });
+
+    markSaved(savedPath);
+    setDataStatus(`Saved ${getFileName(savedPath)}.`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    setDataStatus(`Unable to import JSON: ${message}`, true);
+    setDataStatus(`Unable to save file: ${message}`, true);
   }
+}
+
+async function openSnapshot() {
+  try {
+    const result = await invoke<OpenSnapshotResult | null>('open_import_json');
+    if (!result) {
+      setDataStatus('Open canceled.');
+      return;
+    }
+
+    const parsed = JSON.parse(result.contents);
+    const snapshot = normalizeSnapshot(parsed);
+    applySnapshot(snapshot);
+    currentFilePath = result.path;
+    hasUnsavedChanges = false;
+    beginSession();
+    setDataStatus(`Opened ${getFileName(result.path)}.`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    setDataStatus(`Unable to open file: ${message}`, true);
+  }
+}
+
+function newSnapshot() {
+  applySnapshot(buildEmptySnapshot());
+  currentFilePath = null;
+  hasUnsavedChanges = false;
+  beginSession();
+  setDataStatus('Started a new file. Use Save to choose where it lives.');
 }
 
 // Account management
@@ -1356,6 +1490,7 @@ function renderInterestRows() {
         const field = input.dataset.field as keyof IntEntry;
         getAccountDetails(accountName).interest[field] = readStoredNumber(input.value);
         updateInterestTotals();
+        markDirty();
       });
     });
 
@@ -1392,6 +1527,7 @@ function renderDividendsRows() {
         const field = input.dataset.field as keyof DivEntry;
         getAccountDetails(accountName).dividends[field] = readStoredNumber(input.value);
         updateDividendsTotals();
+        markDirty();
       });
     });
 
@@ -1419,6 +1555,7 @@ function renderMiscRows() {
       const input = event.currentTarget as HTMLInputElement;
       getAccountDetails(accountName).miscIncome = readStoredNumber(input.value);
       updateMiscTotal();
+      markDirty();
     });
 
     tbody.appendChild(row);
@@ -1467,6 +1604,7 @@ function renderB1099Rows(category: B1099Category) {
         getAccountDetails(accountName).b1099[category][field] = readStoredNumber(input.value);
         applyB1099RowState(row, getAccountDetails(accountName).b1099[category]);
         updateB1099SummaryInputs();
+        markDirty();
       });
     });
 
@@ -1512,6 +1650,7 @@ function addAccount(name: string) {
   renderAccounts();
   syncAccountTables();
   newAccountInput.value = '';
+  markDirty();
 }
 
 function removeAccount(index: number) {
@@ -1523,6 +1662,7 @@ function removeAccount(index: number) {
   accounts.splice(index, 1);
   renderAccounts();
   syncAccountTables();
+  markDirty();
 }
 
 addW2Btn.addEventListener('click', addW2Form);
@@ -1534,11 +1674,40 @@ newAccountInput.addEventListener('keypress', (e) => {
   }
 });
 
-exportJsonBtn.addEventListener('click', () => {
-  void exportSnapshot();
+startupNewBtn.addEventListener('click', () => {
+  newSnapshot();
 });
-importJsonBtn.addEventListener('click', () => {
-  void importSnapshot();
+startupOpenBtn.addEventListener('click', () => {
+  void openSnapshot();
+});
+newFileBtn.addEventListener('click', () => {
+  if (!confirmDiscardChanges('Create a new file')) {
+    return;
+  }
+
+  newSnapshot();
+});
+openFileBtn.addEventListener('click', () => {
+  if (!confirmDiscardChanges('Open another file')) {
+    return;
+  }
+
+  void openSnapshot();
+});
+saveFileBtn.addEventListener('click', () => {
+  void saveSnapshot();
+});
+saveAsFileBtn.addEventListener('click', () => {
+  void saveSnapshotAs();
+});
+
+['taxYear', 'filingStatus', 'residentState'].forEach((name) => {
+  const element = form.elements.namedItem(name);
+  if (element instanceof HTMLSelectElement) {
+    element.addEventListener('change', () => {
+      markDirty();
+    });
+  }
 });
 
 syncStateWithAccounts();
@@ -1552,7 +1721,8 @@ updateDividendsTotals();
 updateMiscTotal();
 updateB1099SummaryInputs();
 updateW2SummaryInputs();
-setDataStatus('Data is not auto-saved. Use Save/Open for persistence.');
+updateDocumentChrome();
+setDataStatus('Open an existing file or create a new one to start working.');
 
 const readNumber = (value: FormDataEntryValue | null): number => {
   const parsed = Number(value ?? 0);
