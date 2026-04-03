@@ -1735,6 +1735,56 @@ function updateB1099SummaryInputs() {
 
   shortTermGainsInput!.value = shortTermTotal.toFixed(2);
   longTermGainsInput!.value = longTermTotal.toFixed(2);
+  
+  renderB1099AccountSummary();
+}
+
+function renderB1099AccountSummary() {
+  const tbody = document.getElementById('b1099-account-summary-rows');
+  if (!tbody) return;
+
+  tbody.innerHTML = '';
+  
+  let grandProceeds = 0;
+  let grandCostBasis = 0;
+  let grandWashSale = 0;
+  let grandGainLoss = 0;
+
+  getSortedAccounts().forEach((account) => {
+    const b1099 = getAccountDetails(account.id).b1099;
+    let accountProceeds = 0;
+    let accountCostBasis = 0;
+    let accountWashSale = 0;
+    let accountGainLoss = 0;
+
+    b1099Configs.forEach((config) => {
+      const entry = b1099[config.key];
+      accountProceeds += entry.proceeds;
+      accountCostBasis += entry.costBasis;
+      accountWashSale += entry.washSale;
+      accountGainLoss += calculateB1099Value(entry);
+    });
+    
+    grandProceeds += accountProceeds;
+    grandCostBasis += accountCostBasis;
+    grandWashSale += accountWashSale;
+    grandGainLoss += accountGainLoss;
+
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td>${account.name}</td>
+      <td>${accountProceeds.toFixed(2)}</td>
+      <td>${accountCostBasis.toFixed(2)}</td>
+      <td>${accountWashSale.toFixed(2)}</td>
+      <td class="calculated">${accountGainLoss.toFixed(2)}</td>
+    `;
+    tbody.appendChild(row);
+  });
+
+  setTextContent('b1099-account-summary-proceeds-sum', grandProceeds);
+  setTextContent('b1099-account-summary-cost-sum', grandCostBasis);
+  setTextContent('b1099-account-summary-wash-sum', grandWashSale);
+  setTextContent('b1099-account-summary-gain-sum', grandGainLoss);
 }
 
 function renderInterestRows() {
