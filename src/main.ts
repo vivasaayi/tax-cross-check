@@ -73,20 +73,38 @@ type IntEntry = {
 };
 
 type DivEntry = {
-  ordinaryDividends: number;
-  qualifiedDividends: number;
-  capitalGainDistributions: number;
-  section199ADividends: number;
-  foreignTaxPaid: number;
-  exemptInterestDividends: number;
-  privateActivityBondInterestDividends: number;
-  liquidationDistributions: number;
+  box1aOrdinaryDividends: number;
+  box1bQualifiedDividends: number;
+  box2aCapitalGainDistributions: number;
+  box2bUnrecapturedSection1250Gain: number;
+  box2cSection1202Gain: number;
+  box2dCollectiblesGain: number;
+  box2eSection897OrdinaryDividends: number;
+  box2fSection897CapitalGain: number;
+  box3NondividendDistributions: number;
+  box4FederalIncomeTaxWithheld: number;
+  box5Section199ADividends: number;
+  box6InvestmentExpenses: number;
+  box7ForeignTaxPaid: number;
+  box8CashLiquidationDistributions: number;
+  box9NoncashLiquidationDistributions: number;
+  box10ExemptInterestDividends: number;
+  box11SpecifiedPrivateActivityBondInterestDividends: number;
+  box12StateTaxWithheld: number;
+  box13StateIdentificationNumber: number;
+};
+
+type MiscEntry = {
+  box2Royalties: number;
+  box3OtherIncome: number;
+  box4FederalIncomeTaxWithheld: number;
+  box8SubstitutePayments: number;
 };
 
 type AccountDetails = {
   interest: IntEntry;
   dividends: DivEntry;
-  miscIncome: number;
+  misc: MiscEntry;
   b1099: {
     shortCovered: B1099Entry;
     shortNoncovered: B1099Entry;
@@ -131,6 +149,13 @@ type W2Form = {
   box18LocalWages: number;
   box19LocalIncomeTax: number;
   box20LocalityName: string;
+  box15State2: string;
+  box15EmployerStateId2: string;
+  box16StateWages2: number;
+  box17StateIncomeTax2: number;
+  box18LocalWages2: number;
+  box19LocalIncomeTax2: number;
+  box20LocalityName2: string;
 };
 
 type FormSettings = {
@@ -139,11 +164,17 @@ type FormSettings = {
   residentState: StateCode;
 };
 
+type AccountRecord = {
+  id: string;
+  name: string;
+  order: number;
+};
+
 type AppSnapshot = {
   version: 1;
   formSettings: FormSettings;
   w2Forms: W2Form[];
-  accounts: string[];
+  accounts: AccountRecord[];
   accountDetails: Record<string, AccountDetails>;
 };
 
@@ -191,19 +222,8 @@ app.innerHTML = `
         <p class="eyebrow">Rust + Tauri</p>
         <h1>Tax Cross Check</h1>
         <p class="lede">
-          A desktop calculator to sanity-check TurboTax numbers for federal tax and NJ or NY returns.
-          This version stays intentionally summary-level.
+          A desktop calculator to cross-check federal tax and NJ or NY return numbers from your W-2s and 1099s.
         </p>
-      </div>
-      <div class="hero-card">
-        <p>Included inputs</p>
-        <ul>
-          <li>W-2 wages</li>
-          <li>1099-INT with box detail</li>
-          <li>1099-DIV with box detail</li>
-          <li>1099-MISC</li>
-          <li>1099-B covered and noncovered detail</li>
-        </ul>
       </div>
     </section>
 
@@ -382,7 +402,7 @@ app.innerHTML = `
         </div>
 
         <div class="table-scroll">
-          <table class="b1099-table wide-table">
+          <table class="b1099-table wide-table interest-table">
             <thead>
               <tr>
                 <th>Account Name</th>
@@ -423,22 +443,33 @@ app.innerHTML = `
       <section class="panel accounts-panel">
         <div class="form-header">
           <h2>1099-DIV Dividends</h2>
-          <p>Capture common 1099-DIV boxes by account. Boxes 1a and 1b feed the current estimate.</p>
+          <p>Capture 1099-DIV boxes by account through box 13. Boxes 1a and 1b feed the current estimate.</p>
         </div>
 
         <div class="table-scroll">
-          <table class="b1099-table wide-table">
+          <table class="b1099-table wide-table dividends-table">
             <thead>
               <tr>
                 <th>Account Name</th>
                 <th>Box 1a Ordinary Dividends</th>
                 <th>Box 1b Qualified Dividends</th>
                 <th>Box 2a Capital Gain Distributions</th>
-                <th>Box 5 Section 199A Dividends</th>
-                <th>Box 7 Foreign Tax Paid</th>
-                <th>Box 11 Exempt-Interest Dividends</th>
-                <th>Box 12 Private Activity Bond Interest Dividends</th>
-                <th>Liquidation Distributions</th>
+                <th>Box 2b</th>
+                <th>Box 2c</th>
+                <th>Box 2d</th>
+                <th>Box 2e</th>
+                <th>Box 2f</th>
+                <th>Box 3</th>
+                <th>Box 4</th>
+                <th>Box 5</th>
+                <th>Box 6</th>
+                <th>Box 7</th>
+                <th>Box 8</th>
+                <th>Box 9</th>
+                <th>Box 10</th>
+                <th>Box 11</th>
+                <th>Box 12</th>
+                <th>Box 13</th>
               </tr>
             </thead>
             <tbody id="dividends-rows">
@@ -450,11 +481,22 @@ app.innerHTML = `
                 <td class="sum" id="ordinary-dividends-total">0.00</td>
                 <td class="sum" id="qualified-dividends-total">0.00</td>
                 <td class="sum" id="capital-gain-distributions-total">0.00</td>
+                <td class="sum" id="box-2b-dividends-total">0.00</td>
+                <td class="sum" id="box-2c-dividends-total">0.00</td>
+                <td class="sum" id="box-2d-dividends-total">0.00</td>
+                <td class="sum" id="box-2e-dividends-total">0.00</td>
+                <td class="sum" id="box-2f-dividends-total">0.00</td>
+                <td class="sum" id="box-3-dividends-total">0.00</td>
+                <td class="sum" id="box-4-dividends-total">0.00</td>
                 <td class="sum" id="section-199a-dividends-total">0.00</td>
+                <td class="sum" id="box-6-dividends-total">0.00</td>
                 <td class="sum" id="dividends-foreign-tax-total">0.00</td>
+                <td class="sum" id="box-8-dividends-total">0.00</td>
+                <td class="sum" id="box-9-dividends-total">0.00</td>
                 <td class="sum" id="exempt-interest-dividends-total">0.00</td>
                 <td class="sum" id="private-activity-dividends-total">0.00</td>
-                <td class="sum" id="liquidation-distributions-total">0.00</td>
+                <td class="sum" id="box-12-dividends-total">0.00</td>
+                <td class="sum" id="box-13-dividends-total">0.00</td>
               </tr>
             </tfoot>
           </table>
@@ -466,14 +508,17 @@ app.innerHTML = `
       <section class="panel accounts-panel">
         <div class="form-header">
           <h2>1099-MISC Income</h2>
-          <p>Enter miscellaneous income from each account.</p>
+          <p>Capture 1099-MISC boxes 2, 3, 4, and 8 by account. Boxes 2, 3, and 8 feed misc income, and box 4 adds to federal withholding.</p>
         </div>
 
         <table class="b1099-table">
           <thead>
             <tr>
               <th>Account Name</th>
-              <th>Miscellaneous Income</th>
+              <th>Box 2 Royalties</th>
+              <th>Box 3 Other Income</th>
+              <th>Box 4 Federal Income Tax Withheld</th>
+              <th>Box 8 Substitute Payments</th>
             </tr>
           </thead>
           <tbody id="misc-rows">
@@ -482,7 +527,10 @@ app.innerHTML = `
           <tfoot>
             <tr>
               <td><strong>Total</strong></td>
-              <td class="sum" id="misc-income-total">0.00</td>
+              <td class="sum" id="misc-box-2-total">0.00</td>
+              <td class="sum" id="misc-box-3-total">0.00</td>
+              <td class="sum" id="misc-box-4-total">0.00</td>
+              <td class="sum" id="misc-box-8-total">0.00</td>
             </tr>
           </tfoot>
         </table>
@@ -512,8 +560,8 @@ app.innerHTML = `
                   <th>Total Proceeds</th>
                   <th>Total Cost Basis</th>
                   <th>Wash Sale</th>
-                  <th>Gain/Loss</th>
-                  <th>Calculated</th>
+                  <th>Reported Gain/Loss</th>
+                  <th>Calculated Gain/Loss</th>
                 </tr>
               </thead>
               <tbody id="short-covered-rows">
@@ -526,7 +574,7 @@ app.innerHTML = `
                   <td class="sum" id="short-covered-cost-sum">0.00</td>
                   <td class="sum" id="short-covered-wash-sum">0.00</td>
                   <td class="sum" id="short-covered-gain-sum">0.00</td>
-                  <td></td>
+                  <td class="sum" id="short-covered-calculated-sum">0.00</td>
                 </tr>
               </tfoot>
             </table>
@@ -542,8 +590,8 @@ app.innerHTML = `
                   <th>Total Proceeds</th>
                   <th>Total Cost Basis</th>
                   <th>Wash Sale</th>
-                  <th>Gain/Loss</th>
-                  <th>Calculated</th>
+                  <th>Reported Gain/Loss</th>
+                  <th>Calculated Gain/Loss</th>
                 </tr>
               </thead>
               <tbody id="short-noncovered-rows">
@@ -556,7 +604,7 @@ app.innerHTML = `
                   <td class="sum" id="short-noncovered-cost-sum">0.00</td>
                   <td class="sum" id="short-noncovered-wash-sum">0.00</td>
                   <td class="sum" id="short-noncovered-gain-sum">0.00</td>
-                  <td></td>
+                  <td class="sum" id="short-noncovered-calculated-sum">0.00</td>
                 </tr>
               </tfoot>
             </table>
@@ -572,8 +620,8 @@ app.innerHTML = `
                   <th>Total Proceeds</th>
                   <th>Total Cost Basis</th>
                   <th>Wash Sale</th>
-                  <th>Gain/Loss</th>
-                  <th>Calculated</th>
+                  <th>Reported Gain/Loss</th>
+                  <th>Calculated Gain/Loss</th>
                 </tr>
               </thead>
               <tbody id="long-covered-rows">
@@ -586,7 +634,7 @@ app.innerHTML = `
                   <td class="sum" id="long-covered-cost-sum">0.00</td>
                   <td class="sum" id="long-covered-wash-sum">0.00</td>
                   <td class="sum" id="long-covered-gain-sum">0.00</td>
-                  <td></td>
+                  <td class="sum" id="long-covered-calculated-sum">0.00</td>
                 </tr>
               </tfoot>
             </table>
@@ -602,8 +650,8 @@ app.innerHTML = `
                   <th>Total Proceeds</th>
                   <th>Total Cost Basis</th>
                   <th>Wash Sale</th>
-                  <th>Gain/Loss</th>
-                  <th>Calculated</th>
+                  <th>Reported Gain/Loss</th>
+                  <th>Calculated Gain/Loss</th>
                 </tr>
               </thead>
               <tbody id="long-noncovered-rows">
@@ -616,7 +664,7 @@ app.innerHTML = `
                   <td class="sum" id="long-noncovered-cost-sum">0.00</td>
                   <td class="sum" id="long-noncovered-wash-sum">0.00</td>
                   <td class="sum" id="long-noncovered-gain-sum">0.00</td>
-                  <td></td>
+                  <td class="sum" id="long-noncovered-calculated-sum">0.00</td>
                 </tr>
               </tfoot>
             </table>
@@ -670,8 +718,8 @@ type B1099Category = (typeof b1099Configs)[number]["key"];
 
 const accountTableConfigs: Array<{ tbodyId: string; colspan: number; message: string }> = [
   { tbodyId: "interest-rows", colspan: 10, message: "Add accounts in the Accounts tab to enter 1099-INT details." },
-  { tbodyId: "dividends-rows", colspan: 9, message: "Add accounts in the Accounts tab to enter 1099-DIV details." },
-  { tbodyId: "misc-rows", colspan: 2, message: "Add accounts in the Accounts tab to enter 1099-MISC details." },
+  { tbodyId: "dividends-rows", colspan: 20, message: "Add accounts in the Accounts tab to enter 1099-DIV details." },
+  { tbodyId: "misc-rows", colspan: 5, message: "Add accounts in the Accounts tab to enter 1099-MISC details." },
   ...b1099Configs.map(({ tabId, label }) => ({
     tbodyId: `${tabId}-rows`,
     colspan: 6,
@@ -683,6 +731,8 @@ const readStoredNumber = (value: unknown): number => {
   const parsed = Number(value ?? 0);
   return Number.isFinite(parsed) ? parsed : 0;
 };
+
+const roundMoney = (value: number): number => Math.round(value * 100) / 100;
 
 const formatInputValue = (value: number): string => (Math.abs(value) < 0.005 ? "" : String(value));
 
@@ -706,20 +756,38 @@ const createEmptyInterestEntry = (): IntEntry => ({
 });
 
 const createEmptyDividendsEntry = (): DivEntry => ({
-  ordinaryDividends: 0,
-  qualifiedDividends: 0,
-  capitalGainDistributions: 0,
-  section199ADividends: 0,
-  foreignTaxPaid: 0,
-  exemptInterestDividends: 0,
-  privateActivityBondInterestDividends: 0,
-  liquidationDistributions: 0,
+  box1aOrdinaryDividends: 0,
+  box1bQualifiedDividends: 0,
+  box2aCapitalGainDistributions: 0,
+  box2bUnrecapturedSection1250Gain: 0,
+  box2cSection1202Gain: 0,
+  box2dCollectiblesGain: 0,
+  box2eSection897OrdinaryDividends: 0,
+  box2fSection897CapitalGain: 0,
+  box3NondividendDistributions: 0,
+  box4FederalIncomeTaxWithheld: 0,
+  box5Section199ADividends: 0,
+  box6InvestmentExpenses: 0,
+  box7ForeignTaxPaid: 0,
+  box8CashLiquidationDistributions: 0,
+  box9NoncashLiquidationDistributions: 0,
+  box10ExemptInterestDividends: 0,
+  box11SpecifiedPrivateActivityBondInterestDividends: 0,
+  box12StateTaxWithheld: 0,
+  box13StateIdentificationNumber: 0,
+});
+
+const createEmptyMiscEntry = (): MiscEntry => ({
+  box2Royalties: 0,
+  box3OtherIncome: 0,
+  box4FederalIncomeTaxWithheld: 0,
+  box8SubstitutePayments: 0,
 });
 
 const createEmptyAccountDetails = (): AccountDetails => ({
   interest: createEmptyInterestEntry(),
   dividends: createEmptyDividendsEntry(),
-  miscIncome: 0,
+  misc: createEmptyMiscEntry(),
   b1099: {
     shortCovered: createEmptyB1099Entry(),
     shortNoncovered: createEmptyB1099Entry(),
@@ -764,6 +832,13 @@ const createEmptyW2Form = (): W2Form => ({
   box18LocalWages: 0,
   box19LocalIncomeTax: 0,
   box20LocalityName: "",
+  box15State2: "",
+  box15EmployerStateId2: "",
+  box16StateWages2: 0,
+  box17StateIncomeTax2: 0,
+  box18LocalWages2: 0,
+  box19LocalIncomeTax2: 0,
+  box20LocalityName2: "",
 });
 
 function normalizeB1099Entry(value: unknown): B1099Entry {
@@ -794,23 +869,47 @@ function normalizeInterestEntry(value: unknown): IntEntry {
 function normalizeDividendsEntry(value: unknown): DivEntry {
   const entry = (value ?? {}) as Partial<DivEntry>;
   return {
-    ordinaryDividends: readStoredNumber(entry.ordinaryDividends),
-    qualifiedDividends: readStoredNumber(entry.qualifiedDividends),
-    capitalGainDistributions: readStoredNumber(entry.capitalGainDistributions),
-    section199ADividends: readStoredNumber(entry.section199ADividends),
-    foreignTaxPaid: readStoredNumber(entry.foreignTaxPaid),
-    exemptInterestDividends: readStoredNumber(entry.exemptInterestDividends),
-    privateActivityBondInterestDividends: readStoredNumber(entry.privateActivityBondInterestDividends),
-    liquidationDistributions: readStoredNumber(entry.liquidationDistributions),
+    box1aOrdinaryDividends: readStoredNumber(entry.box1aOrdinaryDividends ?? (entry as Partial<Record<'ordinaryDividends', number>>).ordinaryDividends),
+    box1bQualifiedDividends: readStoredNumber(entry.box1bQualifiedDividends ?? (entry as Partial<Record<'qualifiedDividends', number>>).qualifiedDividends),
+    box2aCapitalGainDistributions: readStoredNumber(entry.box2aCapitalGainDistributions ?? (entry as Partial<Record<'capitalGainDistributions', number>>).capitalGainDistributions),
+    box2bUnrecapturedSection1250Gain: readStoredNumber(entry.box2bUnrecapturedSection1250Gain),
+    box2cSection1202Gain: readStoredNumber(entry.box2cSection1202Gain),
+    box2dCollectiblesGain: readStoredNumber(entry.box2dCollectiblesGain),
+    box2eSection897OrdinaryDividends: readStoredNumber(entry.box2eSection897OrdinaryDividends),
+    box2fSection897CapitalGain: readStoredNumber(entry.box2fSection897CapitalGain),
+    box3NondividendDistributions: readStoredNumber(entry.box3NondividendDistributions),
+    box4FederalIncomeTaxWithheld: readStoredNumber(entry.box4FederalIncomeTaxWithheld),
+    box5Section199ADividends: readStoredNumber(entry.box5Section199ADividends ?? (entry as Partial<Record<'section199ADividends', number>>).section199ADividends),
+    box6InvestmentExpenses: readStoredNumber(entry.box6InvestmentExpenses),
+    box7ForeignTaxPaid: readStoredNumber(entry.box7ForeignTaxPaid ?? (entry as Partial<Record<'foreignTaxPaid', number>>).foreignTaxPaid),
+    box8CashLiquidationDistributions: readStoredNumber(entry.box8CashLiquidationDistributions ?? (entry as Partial<Record<'liquidationDistributions', number>>).liquidationDistributions),
+    box9NoncashLiquidationDistributions: readStoredNumber(entry.box9NoncashLiquidationDistributions),
+    box10ExemptInterestDividends: readStoredNumber(entry.box10ExemptInterestDividends ?? (entry as Partial<Record<'exemptInterestDividends', number>>).exemptInterestDividends),
+    box11SpecifiedPrivateActivityBondInterestDividends: readStoredNumber(entry.box11SpecifiedPrivateActivityBondInterestDividends ?? (entry as Partial<Record<'privateActivityBondInterestDividends', number>>).privateActivityBondInterestDividends),
+    box12StateTaxWithheld: readStoredNumber(entry.box12StateTaxWithheld),
+    box13StateIdentificationNumber: readStoredNumber(entry.box13StateIdentificationNumber),
+  };
+}
+
+function normalizeMiscEntry(value: unknown): MiscEntry {
+  const entry = (value ?? {}) as Partial<MiscEntry>;
+  return {
+    box2Royalties: readStoredNumber(entry.box2Royalties),
+    box3OtherIncome: readStoredNumber(entry.box3OtherIncome ?? (entry as Partial<Record<'miscIncome', number>>).miscIncome),
+    box4FederalIncomeTaxWithheld: readStoredNumber(entry.box4FederalIncomeTaxWithheld),
+    box8SubstitutePayments: readStoredNumber(entry.box8SubstitutePayments),
   };
 }
 
 function normalizeAccountDetails(value: unknown): AccountDetails {
-  const entry = (value ?? {}) as Partial<AccountDetails> & { b1099?: Partial<AccountDetails["b1099"]> };
+  const entry = (value ?? {}) as Partial<AccountDetails> & {
+    b1099?: Partial<AccountDetails["b1099"]>;
+    miscIncome?: number;
+  };
   return {
     interest: normalizeInterestEntry(entry.interest),
     dividends: normalizeDividendsEntry(entry.dividends),
-    miscIncome: readStoredNumber(entry.miscIncome),
+    misc: normalizeMiscEntry(entry.misc ?? { miscIncome: entry.miscIncome }),
     b1099: {
       shortCovered: normalizeB1099Entry(entry.b1099?.shortCovered),
       shortNoncovered: normalizeB1099Entry(entry.b1099?.shortNoncovered),
@@ -858,6 +957,13 @@ function normalizeW2Form(value: unknown): W2Form {
     box18LocalWages: readStoredNumber(entry.box18LocalWages),
     box19LocalIncomeTax: readStoredNumber(entry.box19LocalIncomeTax),
     box20LocalityName: String(entry.box20LocalityName ?? ''),
+    box15State2: String(entry.box15State2 ?? ''),
+    box15EmployerStateId2: String(entry.box15EmployerStateId2 ?? ''),
+    box16StateWages2: readStoredNumber(entry.box16StateWages2),
+    box17StateIncomeTax2: readStoredNumber(entry.box17StateIncomeTax2),
+    box18LocalWages2: readStoredNumber(entry.box18LocalWages2),
+    box19LocalIncomeTax2: readStoredNumber(entry.box19LocalIncomeTax2),
+    box20LocalityName2: String(entry.box20LocalityName2 ?? ''),
   };
 }
 
@@ -872,6 +978,48 @@ function readFormSettings(): FormSettings {
     filingStatus: String(filingStatusField instanceof HTMLSelectElement ? filingStatusField.value : 'single') as FilingStatus,
     residentState: String(residentStateField instanceof HTMLSelectElement ? residentStateField.value : 'nj') as StateCode,
   };
+}
+
+function createAccountRecord(name: string, order: number): AccountRecord {
+  return {
+    id: crypto.randomUUID(),
+    name,
+    order,
+  };
+}
+
+function normalizeAccountRecord(value: unknown, index: number): AccountRecord | null {
+  if (typeof value === 'string') {
+    const name = value.trim();
+    return name ? createAccountRecord(name, index + 1) : null;
+  }
+
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+
+  const account = value as Partial<AccountRecord>;
+  const name = String(account.name ?? '').trim();
+  if (!name) {
+    return null;
+  }
+
+  const parsedOrder = Number(account.order ?? index + 1);
+  return {
+    id: typeof account.id === 'string' && account.id ? account.id : crypto.randomUUID(),
+    name,
+    order: Number.isFinite(parsedOrder) ? Math.max(1, Math.round(parsedOrder)) : index + 1,
+  };
+}
+
+function sortAccounts(items: AccountRecord[]): AccountRecord[] {
+  return [...items].sort((left, right) => {
+    if (left.order !== right.order) {
+      return left.order - right.order;
+    }
+
+    return left.name.localeCompare(right.name);
+  });
 }
 
 function applyFormSettings(settings: FormSettings) {
@@ -903,6 +1051,24 @@ function buildSnapshot(): AppSnapshot {
 
 function normalizeSnapshot(value: unknown): AppSnapshot {
   const snapshot = (value ?? {}) as Partial<AppSnapshot>;
+  const normalizedAccounts = Array.isArray(snapshot.accounts)
+    ? snapshot.accounts
+        .map((entry, index) => normalizeAccountRecord(entry, index))
+        .filter((entry): entry is AccountRecord => entry !== null)
+    : [];
+
+  const rawAccountDetails = snapshot.accountDetails && typeof snapshot.accountDetails === 'object'
+    ? snapshot.accountDetails
+    : {};
+
+  const normalizedAccountDetails = Object.fromEntries(
+    normalizedAccounts.map((account) => {
+      const byId = rawAccountDetails[account.id];
+      const byLegacyName = rawAccountDetails[account.name];
+      return [account.id, normalizeAccountDetails(byId ?? byLegacyName)];
+    }),
+  );
+
   return {
     version: 1,
     formSettings: {
@@ -911,12 +1077,8 @@ function normalizeSnapshot(value: unknown): AppSnapshot {
       residentState: String(snapshot.formSettings?.residentState ?? 'nj') as StateCode,
     },
     w2Forms: Array.isArray(snapshot.w2Forms) ? snapshot.w2Forms.map((entry) => normalizeW2Form(entry)) : [],
-    accounts: Array.isArray(snapshot.accounts)
-      ? snapshot.accounts.map((value) => String(value).trim()).filter((value, index, values) => value.length > 0 && values.indexOf(value) === index)
-      : [],
-    accountDetails: snapshot.accountDetails && typeof snapshot.accountDetails === 'object'
-      ? Object.fromEntries(Object.entries(snapshot.accountDetails).map(([accountName, entry]) => [accountName, normalizeAccountDetails(entry)]))
-      : {},
+    accounts: sortAccounts(normalizedAccounts),
+    accountDetails: normalizedAccountDetails,
   };
 }
 
@@ -932,7 +1094,11 @@ function setTextContent(id: string, value: number) {
 }
 
 function calculateB1099Value(entry: B1099Entry): number {
-  return entry.proceeds - entry.costBasis - entry.washSale;
+  return roundMoney(entry.proceeds - entry.costBasis + entry.washSale);
+}
+
+function calculateB1099ReportedValue(entry: B1099Entry): number {
+  return roundMoney(entry.proceeds - entry.costBasis);
 }
 
 // Main tab switching
@@ -1050,18 +1216,32 @@ function updateW2SummaryInputs() {
   let wages = 0;
   let federalWithholding = 0;
   let stateWithholding = 0;
+  let miscFederalWithholding = 0;
+  const residentStateField = form!.elements.namedItem('residentState');
+  const residentStateCode = String(residentStateField instanceof HTMLSelectElement ? residentStateField.value : '').toUpperCase();
 
   w2Forms.forEach((entry) => {
     wages += entry.box1Wages;
     federalWithholding += entry.box2FederalWithholding;
-    stateWithholding += entry.box17StateIncomeTax;
+
+    if (entry.box15State.trim().toUpperCase() === residentStateCode) {
+      stateWithholding += entry.box17StateIncomeTax;
+    }
+
+    if (entry.box15State2.trim().toUpperCase() === residentStateCode) {
+      stateWithholding += entry.box17StateIncomeTax2;
+    }
+  });
+
+  getSortedAccounts().forEach((account) => {
+    miscFederalWithholding += getAccountDetails(account.id).misc.box4FederalIncomeTaxWithheld;
   });
 
   setTextContent('w2-wages-total', wages);
   setTextContent('w2-federal-total', federalWithholding);
   setTextContent('w2-state-total', stateWithholding);
   wagesInput!.value = wages.toFixed(2);
-  federalWithholdingInput!.value = federalWithholding.toFixed(2);
+  federalWithholdingInput!.value = (federalWithholding + miscFederalWithholding).toFixed(2);
   stateWithholdingInput!.value = stateWithholding.toFixed(2);
 }
 
@@ -1128,13 +1308,21 @@ function renderW2Forms() {
 
         <label><span>Box 14 other label</span><input type="text" data-string-field="box14OtherLabel" value="${entry.box14OtherLabel}" /></label>
         <label><span>Box 14 other amount</span><input type="number" step="0.01" data-number-field="box14OtherAmount" value="${formatInputValue(entry.box14OtherAmount)}" /></label>
-        <label><span>Box 15 state</span><input type="text" data-string-field="box15State" value="${entry.box15State}" /></label>
-        <label><span>Box 15 employer state ID</span><input type="text" data-string-field="box15EmployerStateId" value="${entry.box15EmployerStateId}" /></label>
-        <label><span>Box 16 state wages</span><input type="number" step="0.01" data-number-field="box16StateWages" value="${formatInputValue(entry.box16StateWages)}" /></label>
-        <label><span>Box 17 state income tax</span><input type="number" step="0.01" data-number-field="box17StateIncomeTax" value="${formatInputValue(entry.box17StateIncomeTax)}" /></label>
-        <label><span>Box 18 local wages</span><input type="number" step="0.01" data-number-field="box18LocalWages" value="${formatInputValue(entry.box18LocalWages)}" /></label>
-        <label><span>Box 19 local income tax</span><input type="number" step="0.01" data-number-field="box19LocalIncomeTax" value="${formatInputValue(entry.box19LocalIncomeTax)}" /></label>
-        <label><span>Box 20 locality name</span><input type="text" data-string-field="box20LocalityName" value="${entry.box20LocalityName}" /></label>
+        <label><span>Box 15 state line 1</span><input type="text" data-string-field="box15State" value="${entry.box15State}" /></label>
+        <label><span>Box 15 employer state ID line 1</span><input type="text" data-string-field="box15EmployerStateId" value="${entry.box15EmployerStateId}" /></label>
+        <label><span>Box 16 state wages line 1</span><input type="number" step="0.01" data-number-field="box16StateWages" value="${formatInputValue(entry.box16StateWages)}" /></label>
+        <label><span>Box 17 state income tax line 1</span><input type="number" step="0.01" data-number-field="box17StateIncomeTax" value="${formatInputValue(entry.box17StateIncomeTax)}" /></label>
+        <label><span>Box 18 local wages line 1</span><input type="number" step="0.01" data-number-field="box18LocalWages" value="${formatInputValue(entry.box18LocalWages)}" /></label>
+        <label><span>Box 19 local income tax line 1</span><input type="number" step="0.01" data-number-field="box19LocalIncomeTax" value="${formatInputValue(entry.box19LocalIncomeTax)}" /></label>
+        <label><span>Box 20 locality name line 1</span><input type="text" data-string-field="box20LocalityName" value="${entry.box20LocalityName}" /></label>
+
+        <label><span>Box 15 state line 2</span><input type="text" data-string-field="box15State2" value="${entry.box15State2}" /></label>
+        <label><span>Box 15 employer state ID line 2</span><input type="text" data-string-field="box15EmployerStateId2" value="${entry.box15EmployerStateId2}" /></label>
+        <label><span>Box 16 state wages line 2</span><input type="number" step="0.01" data-number-field="box16StateWages2" value="${formatInputValue(entry.box16StateWages2)}" /></label>
+        <label><span>Box 17 state income tax line 2</span><input type="number" step="0.01" data-number-field="box17StateIncomeTax2" value="${formatInputValue(entry.box17StateIncomeTax2)}" /></label>
+        <label><span>Box 18 local wages line 2</span><input type="number" step="0.01" data-number-field="box18LocalWages2" value="${formatInputValue(entry.box18LocalWages2)}" /></label>
+        <label><span>Box 19 local income tax line 2</span><input type="number" step="0.01" data-number-field="box19LocalIncomeTax2" value="${formatInputValue(entry.box19LocalIncomeTax2)}" /></label>
+        <label><span>Box 20 locality name line 2</span><input type="text" data-string-field="box20LocalityName2" value="${entry.box20LocalityName2}" /></label>
       </div>
     `;
 
@@ -1279,27 +1467,35 @@ const accountsList = document.getElementById('accounts-list') as HTMLElement;
 const newAccountInput = document.getElementById('new-account-name') as HTMLInputElement;
 const addAccountBtn = document.getElementById('add-account-btn') as HTMLButtonElement;
 
-let accounts: string[] = [];
+let accounts: AccountRecord[] = [];
 let accountDetails: Record<string, AccountDetails> = {};
+
+function getSortedAccounts(): AccountRecord[] {
+  return sortAccounts(accounts);
+}
+
+function getNextAccountOrder(): number {
+  return accounts.reduce((maxOrder, account) => Math.max(maxOrder, account.order), 0) + 1;
+}
 
 function syncStateWithAccounts() {
   const nextDetails: Record<string, AccountDetails> = {};
 
-  accounts.forEach((accountName) => {
-    nextDetails[accountName] = accountDetails[accountName]
-      ? normalizeAccountDetails(accountDetails[accountName])
+  accounts.forEach((account) => {
+    nextDetails[account.id] = accountDetails[account.id]
+      ? normalizeAccountDetails(accountDetails[account.id])
       : createEmptyAccountDetails();
   });
 
   accountDetails = nextDetails;
 }
 
-function getAccountDetails(accountName: string): AccountDetails {
-  if (!accountDetails[accountName]) {
-    accountDetails[accountName] = createEmptyAccountDetails();
+function getAccountDetails(accountId: string): AccountDetails {
+  if (!accountDetails[accountId]) {
+    accountDetails[accountId] = createEmptyAccountDetails();
   }
 
-  return accountDetails[accountName];
+  return accountDetails[accountId];
 }
 
 function renderEmptyState(tbodyId: string, colspan: number, message: string) {
@@ -1347,8 +1543,8 @@ function updateInterestTotals() {
   let bondPremium = 0;
   let treasuryBondPremium = 0;
 
-  accounts.forEach((accountName) => {
-    const entry = getAccountDetails(accountName).interest;
+  getSortedAccounts().forEach((account) => {
+    const entry = getAccountDetails(account.id).interest;
     taxable += entry.taxableInterest;
     treasury += entry.treasuryInterest;
     taxExempt += entry.taxExemptInterest;
@@ -1376,44 +1572,94 @@ function updateDividendsTotals() {
   let ordinary = 0;
   let qualified = 0;
   let capitalGain = 0;
+  let box2b = 0;
+  let box2c = 0;
+  let box2d = 0;
+  let box2e = 0;
+  let box2f = 0;
+  let box3 = 0;
+  let box4 = 0;
   let section199A = 0;
+  let box6 = 0;
   let foreignTax = 0;
+  let box8 = 0;
+  let box9 = 0;
   let exemptInterest = 0;
   let privateActivity = 0;
-  let liquidation = 0;
+  let box12 = 0;
+  let box13 = 0;
 
-  accounts.forEach((accountName) => {
-    const entry = getAccountDetails(accountName).dividends;
-    ordinary += entry.ordinaryDividends;
-    qualified += entry.qualifiedDividends;
-    capitalGain += entry.capitalGainDistributions;
-    section199A += entry.section199ADividends;
-    foreignTax += entry.foreignTaxPaid;
-    exemptInterest += entry.exemptInterestDividends;
-    privateActivity += entry.privateActivityBondInterestDividends;
-    liquidation += entry.liquidationDistributions;
+  getSortedAccounts().forEach((account) => {
+    const entry = getAccountDetails(account.id).dividends;
+    ordinary += entry.box1aOrdinaryDividends;
+    qualified += entry.box1bQualifiedDividends;
+    capitalGain += entry.box2aCapitalGainDistributions;
+    box2b += entry.box2bUnrecapturedSection1250Gain;
+    box2c += entry.box2cSection1202Gain;
+    box2d += entry.box2dCollectiblesGain;
+    box2e += entry.box2eSection897OrdinaryDividends;
+    box2f += entry.box2fSection897CapitalGain;
+    box3 += entry.box3NondividendDistributions;
+    box4 += entry.box4FederalIncomeTaxWithheld;
+    section199A += entry.box5Section199ADividends;
+    box6 += entry.box6InvestmentExpenses;
+    foreignTax += entry.box7ForeignTaxPaid;
+    box8 += entry.box8CashLiquidationDistributions;
+    box9 += entry.box9NoncashLiquidationDistributions;
+    exemptInterest += entry.box10ExemptInterestDividends;
+    privateActivity += entry.box11SpecifiedPrivateActivityBondInterestDividends;
+    box12 += entry.box12StateTaxWithheld;
+    box13 += entry.box13StateIdentificationNumber;
   });
 
   setTextContent('ordinary-dividends-total', ordinary);
   setTextContent('qualified-dividends-total', qualified);
   setTextContent('capital-gain-distributions-total', capitalGain);
+  setTextContent('box-2b-dividends-total', box2b);
+  setTextContent('box-2c-dividends-total', box2c);
+  setTextContent('box-2d-dividends-total', box2d);
+  setTextContent('box-2e-dividends-total', box2e);
+  setTextContent('box-2f-dividends-total', box2f);
+  setTextContent('box-3-dividends-total', box3);
+  setTextContent('box-4-dividends-total', box4);
   setTextContent('section-199a-dividends-total', section199A);
+  setTextContent('box-6-dividends-total', box6);
   setTextContent('dividends-foreign-tax-total', foreignTax);
+  setTextContent('box-8-dividends-total', box8);
+  setTextContent('box-9-dividends-total', box9);
   setTextContent('exempt-interest-dividends-total', exemptInterest);
   setTextContent('private-activity-dividends-total', privateActivity);
-  setTextContent('liquidation-distributions-total', liquidation);
+  setTextContent('box-12-dividends-total', box12);
+  setTextContent('box-13-dividends-total', box13);
   ordinaryDividendsInput!.value = ordinary.toFixed(2);
   qualifiedDividendsInput!.value = qualified.toFixed(2);
 }
 
 function updateMiscTotal() {
-  let total = 0;
-  accounts.forEach((accountName) => {
-    total += getAccountDetails(accountName).miscIncome;
+  let box2 = 0;
+  let box3 = 0;
+  let box4 = 0;
+  let box8 = 0;
+
+  getSortedAccounts().forEach((account) => {
+    const entry = getAccountDetails(account.id).misc;
+    box2 += entry.box2Royalties;
+    box3 += entry.box3OtherIncome;
+    box4 += entry.box4FederalIncomeTaxWithheld;
+    box8 += entry.box8SubstitutePayments;
   });
 
-  setTextContent('misc-income-total', total);
-  miscIncomeInput!.value = total.toFixed(2);
+  setTextContent('misc-box-2-total', box2);
+  setTextContent('misc-box-3-total', box3);
+  setTextContent('misc-box-4-total', box4);
+  setTextContent('misc-box-8-total', box8);
+  miscIncomeInput!.value = (box2 + box3 + box8).toFixed(2);
+
+  let w2FederalWithholding = 0;
+  w2Forms.forEach((entry) => {
+    w2FederalWithholding += entry.box2FederalWithholding;
+  });
+  federalWithholdingInput!.value = (w2FederalWithholding + box4).toFixed(2);
 }
 
 function updateB1099CategoryTotals(category: B1099Category) {
@@ -1422,19 +1668,22 @@ function updateB1099CategoryTotals(category: B1099Category) {
   let costBasis = 0;
   let washSale = 0;
   let gainLoss = 0;
+  let calculatedGainLoss = 0;
 
-  accounts.forEach((accountName) => {
-    const entry = getAccountDetails(accountName).b1099[category];
+  getSortedAccounts().forEach((account) => {
+    const entry = getAccountDetails(account.id).b1099[category];
     proceeds += entry.proceeds;
     costBasis += entry.costBasis;
     washSale += entry.washSale;
-    gainLoss += entry.gainLoss;
+    gainLoss += calculateB1099ReportedValue(entry);
+    calculatedGainLoss += calculateB1099Value(entry);
   });
 
   setTextContent(`${config.tabId}-proceeds-sum`, proceeds);
   setTextContent(`${config.tabId}-cost-sum`, costBasis);
   setTextContent(`${config.tabId}-wash-sum`, washSale);
   setTextContent(`${config.tabId}-gain-sum`, gainLoss);
+  setTextContent(`${config.tabId}-calculated-sum`, calculatedGainLoss);
 }
 
 function updateB1099SummaryInputs() {
@@ -1443,8 +1692,8 @@ function updateB1099SummaryInputs() {
 
   b1099Configs.forEach((config) => {
     let categoryTotal = 0;
-    accounts.forEach((accountName) => {
-      categoryTotal += getAccountDetails(accountName).b1099[config.key].gainLoss;
+    getSortedAccounts().forEach((account) => {
+      categoryTotal += calculateB1099Value(getAccountDetails(account.id).b1099[config.key]);
     });
 
     if (config.term === 'short') {
@@ -1468,12 +1717,12 @@ function renderInterestRows() {
 
   tbody.innerHTML = '';
 
-  accounts.forEach((accountName) => {
-    const entry = getAccountDetails(accountName).interest;
+  getSortedAccounts().forEach((account) => {
+    const entry = getAccountDetails(account.id).interest;
     const row = document.createElement('tr');
     row.className = 'data-row';
     row.innerHTML = `
-      <td><input type="text" value="${accountName}" readonly /></td>
+      <td><input type="text" value="${account.name}" readonly /></td>
       <td><input type="number" step="0.01" data-field="taxableInterest" value="${formatInputValue(entry.taxableInterest)}" /></td>
       <td><input type="number" step="0.01" data-field="treasuryInterest" value="${formatInputValue(entry.treasuryInterest)}" /></td>
       <td><input type="number" step="0.01" data-field="taxExemptInterest" value="${formatInputValue(entry.taxExemptInterest)}" /></td>
@@ -1488,7 +1737,7 @@ function renderInterestRows() {
     row.querySelectorAll<HTMLInputElement>('input[data-field]').forEach((input) => {
       input.addEventListener('input', () => {
         const field = input.dataset.field as keyof IntEntry;
-        getAccountDetails(accountName).interest[field] = readStoredNumber(input.value);
+        getAccountDetails(account.id).interest[field] = readStoredNumber(input.value);
         updateInterestTotals();
         markDirty();
       });
@@ -1506,26 +1755,37 @@ function renderDividendsRows() {
 
   tbody.innerHTML = '';
 
-  accounts.forEach((accountName) => {
-    const entry = getAccountDetails(accountName).dividends;
+  getSortedAccounts().forEach((account) => {
+    const entry = getAccountDetails(account.id).dividends;
     const row = document.createElement('tr');
     row.className = 'data-row';
     row.innerHTML = `
-      <td><input type="text" value="${accountName}" readonly /></td>
-      <td><input type="number" step="0.01" data-field="ordinaryDividends" value="${formatInputValue(entry.ordinaryDividends)}" /></td>
-      <td><input type="number" step="0.01" data-field="qualifiedDividends" value="${formatInputValue(entry.qualifiedDividends)}" /></td>
-      <td><input type="number" step="0.01" data-field="capitalGainDistributions" value="${formatInputValue(entry.capitalGainDistributions)}" /></td>
-      <td><input type="number" step="0.01" data-field="section199ADividends" value="${formatInputValue(entry.section199ADividends)}" /></td>
-      <td><input type="number" step="0.01" data-field="foreignTaxPaid" value="${formatInputValue(entry.foreignTaxPaid)}" /></td>
-      <td><input type="number" step="0.01" data-field="exemptInterestDividends" value="${formatInputValue(entry.exemptInterestDividends)}" /></td>
-      <td><input type="number" step="0.01" data-field="privateActivityBondInterestDividends" value="${formatInputValue(entry.privateActivityBondInterestDividends)}" /></td>
-      <td><input type="number" step="0.01" data-field="liquidationDistributions" value="${formatInputValue(entry.liquidationDistributions)}" /></td>
+      <td><input type="text" value="${account.name}" readonly /></td>
+      <td><input type="number" step="0.01" data-field="box1aOrdinaryDividends" value="${formatInputValue(entry.box1aOrdinaryDividends)}" /></td>
+      <td><input type="number" step="0.01" data-field="box1bQualifiedDividends" value="${formatInputValue(entry.box1bQualifiedDividends)}" /></td>
+      <td><input type="number" step="0.01" data-field="box2aCapitalGainDistributions" value="${formatInputValue(entry.box2aCapitalGainDistributions)}" /></td>
+      <td><input type="number" step="0.01" data-field="box2bUnrecapturedSection1250Gain" value="${formatInputValue(entry.box2bUnrecapturedSection1250Gain)}" /></td>
+      <td><input type="number" step="0.01" data-field="box2cSection1202Gain" value="${formatInputValue(entry.box2cSection1202Gain)}" /></td>
+      <td><input type="number" step="0.01" data-field="box2dCollectiblesGain" value="${formatInputValue(entry.box2dCollectiblesGain)}" /></td>
+      <td><input type="number" step="0.01" data-field="box2eSection897OrdinaryDividends" value="${formatInputValue(entry.box2eSection897OrdinaryDividends)}" /></td>
+      <td><input type="number" step="0.01" data-field="box2fSection897CapitalGain" value="${formatInputValue(entry.box2fSection897CapitalGain)}" /></td>
+      <td><input type="number" step="0.01" data-field="box3NondividendDistributions" value="${formatInputValue(entry.box3NondividendDistributions)}" /></td>
+      <td><input type="number" step="0.01" data-field="box4FederalIncomeTaxWithheld" value="${formatInputValue(entry.box4FederalIncomeTaxWithheld)}" /></td>
+      <td><input type="number" step="0.01" data-field="box5Section199ADividends" value="${formatInputValue(entry.box5Section199ADividends)}" /></td>
+      <td><input type="number" step="0.01" data-field="box6InvestmentExpenses" value="${formatInputValue(entry.box6InvestmentExpenses)}" /></td>
+      <td><input type="number" step="0.01" data-field="box7ForeignTaxPaid" value="${formatInputValue(entry.box7ForeignTaxPaid)}" /></td>
+      <td><input type="number" step="0.01" data-field="box8CashLiquidationDistributions" value="${formatInputValue(entry.box8CashLiquidationDistributions)}" /></td>
+      <td><input type="number" step="0.01" data-field="box9NoncashLiquidationDistributions" value="${formatInputValue(entry.box9NoncashLiquidationDistributions)}" /></td>
+      <td><input type="number" step="0.01" data-field="box10ExemptInterestDividends" value="${formatInputValue(entry.box10ExemptInterestDividends)}" /></td>
+      <td><input type="number" step="0.01" data-field="box11SpecifiedPrivateActivityBondInterestDividends" value="${formatInputValue(entry.box11SpecifiedPrivateActivityBondInterestDividends)}" /></td>
+      <td><input type="number" step="0.01" data-field="box12StateTaxWithheld" value="${formatInputValue(entry.box12StateTaxWithheld)}" /></td>
+      <td><input type="number" step="0.01" data-field="box13StateIdentificationNumber" value="${formatInputValue(entry.box13StateIdentificationNumber)}" /></td>
     `;
 
     row.querySelectorAll<HTMLInputElement>('input[data-field]').forEach((input) => {
       input.addEventListener('input', () => {
         const field = input.dataset.field as keyof DivEntry;
-        getAccountDetails(accountName).dividends[field] = readStoredNumber(input.value);
+        getAccountDetails(account.id).dividends[field] = readStoredNumber(input.value);
         updateDividendsTotals();
         markDirty();
       });
@@ -1543,19 +1803,25 @@ function renderMiscRows() {
 
   tbody.innerHTML = '';
 
-  accounts.forEach((accountName) => {
+  getSortedAccounts().forEach((account) => {
+    const entry = getAccountDetails(account.id).misc;
     const row = document.createElement('tr');
     row.className = 'data-row';
     row.innerHTML = `
-      <td><input type="text" value="${accountName}" readonly /></td>
-      <td><input type="number" step="0.01" value="${formatInputValue(getAccountDetails(accountName).miscIncome)}" /></td>
+      <td><input type="text" value="${account.name}" readonly /></td>
+      <td><input type="number" step="0.01" data-field="box2Royalties" value="${formatInputValue(entry.box2Royalties)}" /></td>
+      <td><input type="number" step="0.01" data-field="box3OtherIncome" value="${formatInputValue(entry.box3OtherIncome)}" /></td>
+      <td><input type="number" step="0.01" data-field="box4FederalIncomeTaxWithheld" value="${formatInputValue(entry.box4FederalIncomeTaxWithheld)}" /></td>
+      <td><input type="number" step="0.01" data-field="box8SubstitutePayments" value="${formatInputValue(entry.box8SubstitutePayments)}" /></td>
     `;
 
-    row.querySelector<HTMLInputElement>('input[type="number"]')?.addEventListener('input', (event) => {
-      const input = event.currentTarget as HTMLInputElement;
-      getAccountDetails(accountName).miscIncome = readStoredNumber(input.value);
-      updateMiscTotal();
-      markDirty();
+    row.querySelectorAll<HTMLInputElement>('input[data-field]').forEach((input) => {
+      input.addEventListener('input', () => {
+        const field = input.dataset.field as keyof MiscEntry;
+        getAccountDetails(account.id).misc[field] = readStoredNumber(input.value);
+        updateMiscTotal();
+        markDirty();
+      });
     });
 
     tbody.appendChild(row);
@@ -1563,13 +1829,21 @@ function renderMiscRows() {
 }
 
 function applyB1099RowState(row: HTMLTableRowElement, entry: B1099Entry) {
+  const reportedValue = calculateB1099ReportedValue(entry);
   const calculatedValue = calculateB1099Value(entry);
   const calculatedCell = row.querySelector<HTMLElement>('.calculated');
+  const reportedInput = row.querySelector<HTMLInputElement>('input[data-field="gainLoss"]');
+  if (reportedInput) {
+    reportedInput.value = formatInputValue(reportedValue);
+  }
   if (calculatedCell) {
     calculatedCell.textContent = calculatedValue.toFixed(2);
   }
 
-  if (Math.abs(calculatedValue - entry.gainLoss) > 0.01) {
+  const reportedDisplayValue = reportedValue.toFixed(2);
+  const calculatedDisplayValue = calculatedValue.toFixed(2);
+
+  if (reportedDisplayValue !== calculatedDisplayValue) {
     row.classList.add('mismatch');
   } else {
     row.classList.remove('mismatch');
@@ -1585,24 +1859,28 @@ function renderB1099Rows(category: B1099Category) {
 
   tbody.innerHTML = '';
 
-  accounts.forEach((accountName) => {
-    const entry = getAccountDetails(accountName).b1099[category];
+  getSortedAccounts().forEach((account) => {
+    const entry = getAccountDetails(account.id).b1099[category];
+    entry.gainLoss = calculateB1099ReportedValue(entry);
     const row = document.createElement('tr');
     row.className = 'data-row';
     row.innerHTML = `
-      <td><input type="text" value="${accountName}" readonly /></td>
+      <td><input type="text" value="${account.name}" readonly /></td>
       <td><input type="number" step="0.01" data-field="proceeds" value="${formatInputValue(entry.proceeds)}" /></td>
       <td><input type="number" step="0.01" data-field="costBasis" value="${formatInputValue(entry.costBasis)}" /></td>
       <td><input type="number" step="0.01" data-field="washSale" value="${formatInputValue(entry.washSale)}" /></td>
-      <td><input type="number" step="0.01" data-field="gainLoss" value="${formatInputValue(entry.gainLoss)}" /></td>
+      <td><input type="number" step="0.01" data-field="gainLoss" value="${formatInputValue(entry.gainLoss)}" readonly /></td>
       <td class="calculated">0.00</td>
     `;
 
     row.querySelectorAll<HTMLInputElement>('input[data-field]').forEach((input) => {
       input.addEventListener('input', () => {
         const field = input.dataset.field as keyof B1099Entry;
-        getAccountDetails(accountName).b1099[category][field] = readStoredNumber(input.value);
-        applyB1099RowState(row, getAccountDetails(accountName).b1099[category]);
+        if (field !== 'gainLoss') {
+          getAccountDetails(account.id).b1099[category][field] = readStoredNumber(input.value);
+          getAccountDetails(account.id).b1099[category].gainLoss = calculateB1099ReportedValue(getAccountDetails(account.id).b1099[category]);
+        }
+        applyB1099RowState(row, getAccountDetails(account.id).b1099[category]);
         updateB1099SummaryInputs();
         markDirty();
       });
@@ -1628,38 +1906,81 @@ function syncAccountTables() {
 
 function renderAccounts() {
   accountsList.innerHTML = '';
-  accounts.forEach((account, index) => {
+  getSortedAccounts().forEach((account) => {
     const item = document.createElement('div');
     item.className = 'account-item';
     item.innerHTML = `
-      <span>${account}</span>
-      <button type="button" data-index="${index}">×</button>
+      <div class="account-item-fields">
+        <label>
+          <span>Order</span>
+          <input type="number" min="1" step="1" value="${account.order}" data-account-order="${account.id}" />
+        </label>
+        <label class="account-name-field">
+          <span>Account Name</span>
+          <input type="text" value="${account.name}" data-account-name="${account.id}" />
+        </label>
+      </div>
+      <button type="button" data-account-remove="${account.id}">×</button>
     `;
-    item.querySelector('button')?.addEventListener('click', () => removeAccount(index));
+
+    item.querySelector<HTMLInputElement>(`input[data-account-order="${account.id}"]`)?.addEventListener('change', (event) => {
+      const input = event.currentTarget as HTMLInputElement;
+      const target = accounts.find((entry) => entry.id === account.id);
+      if (!target) {
+        return;
+      }
+
+      const parsedOrder = Number(input.value);
+      target.order = Number.isFinite(parsedOrder) ? Math.max(1, Math.round(parsedOrder)) : target.order;
+      renderAccounts();
+      syncAccountTables();
+      markDirty();
+    });
+
+    item.querySelector<HTMLInputElement>(`input[data-account-name="${account.id}"]`)?.addEventListener('change', (event) => {
+      const input = event.currentTarget as HTMLInputElement;
+      const target = accounts.find((entry) => entry.id === account.id);
+      if (!target) {
+        return;
+      }
+
+      const trimmedName = input.value.trim();
+      if (!trimmedName) {
+        input.value = target.name;
+        return;
+      }
+
+      target.name = trimmedName;
+      renderAccounts();
+      syncAccountTables();
+      markDirty();
+    });
+
+    item.querySelector<HTMLButtonElement>(`button[data-account-remove="${account.id}"]`)?.addEventListener('click', () => removeAccount(account.id));
     accountsList.appendChild(item);
   });
 }
 
 function addAccount(name: string) {
   const trimmedName = name.trim();
-  if (!trimmedName || accounts.includes(trimmedName)) {
+  if (!trimmedName || accounts.some((account) => account.name === trimmedName)) {
     return;
   }
 
-  accounts.push(trimmedName);
+  accounts.push(createAccountRecord(trimmedName, getNextAccountOrder()));
   renderAccounts();
   syncAccountTables();
   newAccountInput.value = '';
   markDirty();
 }
 
-function removeAccount(index: number) {
-  const accountName = accounts[index];
-  if (!accountName) {
+function removeAccount(accountId: string) {
+  const nextAccounts = accounts.filter((account) => account.id !== accountId);
+  if (nextAccounts.length === accounts.length) {
     return;
   }
 
-  accounts.splice(index, 1);
+  accounts = nextAccounts;
   renderAccounts();
   syncAccountTables();
   markDirty();
@@ -1705,6 +2026,9 @@ saveAsFileBtn.addEventListener('click', () => {
   const element = form.elements.namedItem(name);
   if (element instanceof HTMLSelectElement) {
     element.addEventListener('change', () => {
+      if (name === 'residentState') {
+        updateW2SummaryInputs();
+      }
       markDirty();
     });
   }

@@ -1,22 +1,19 @@
 :root {
   color-scheme: light;
-  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
+  font-family: "Segoe UI", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  background:
-    radial-gradient(circle at top left, rgba(247, 204, 119, 0.35), transparent 30%),
-    radial-gradient(circle at bottom right, rgba(73, 120, 101, 0.16), transparent 30%),
-    linear-gradient(180deg, #f7f1e4 0%, #fbf8f2 100%);
-  color: #203028;
-  --surface: rgba(255, 253, 249, 0.82);
-  --surface-strong: #fffdf9;
-  --border: rgba(32, 48, 40, 0.12);
-  --shadow: 0 18px 40px rgba(52, 52, 35, 0.1);
-  --accent: #8f4d2d;
-  --accent-strong: #6e3216;
-  --tab-idle: rgba(255, 252, 246, 0.94);
-  --tab-active: linear-gradient(135deg, #9b5734 0%, #6e3216 100%);
-  --muted: #5b665f;
+  background: #f5f6f8;
+  color: #1f2328;
+  --surface: #ffffff;
+  --surface-strong: #ffffff;
+  --border: #d0d7de;
+  --shadow: 0 1px 3px rgba(31, 35, 40, 0.08);
+  --accent: #0b57d0;
+  --accent-strong: #0842a0;
+  --tab-idle: #ffffff;
+  --tab-active: #e8f0fe;
+  --muted: #59636e;
 }
 
 * {
@@ -27,6 +24,7 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  background: #f5f6f8;
 }
 
 button,
@@ -37,9 +35,9 @@ select {
 
 .shell {
   position: relative;
-  width: min(1280px, calc(100vw - 32px));
+  width: min(1280px, calc(100vw - 40px));
   margin: 0 auto;
-  padding: 32px 0 48px;
+  padding: 20px 0 32px;
 }
 
 .startup-gate {
@@ -49,8 +47,8 @@ select {
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: rgba(247, 241, 228, 0.72);
-  backdrop-filter: blur(12px);
+  background: rgba(245, 246, 248, 0.78);
+  backdrop-filter: blur(6px);
   z-index: 20;
 }
 
@@ -60,11 +58,10 @@ select {
 
 .startup-card {
   width: min(680px, 100%);
-  padding: 32px;
-  border-radius: 28px;
+  padding: 28px;
+  border-radius: 14px;
   border: 1px solid var(--border);
   background: var(--surface);
-  backdrop-filter: blur(12px);
   box-shadow: var(--shadow);
 }
 
@@ -80,28 +77,25 @@ select {
 }
 
 .hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1.8fr) minmax(280px, 1fr);
-  gap: 24px;
-  margin-bottom: 24px;
-  animation: rise 420ms ease-out;
+  display: block;
+  margin-bottom: 16px;
 }
 
 .document-bar {
   display: grid;
   grid-template-columns: minmax(0, 1.3fr) auto;
-  gap: 18px 24px;
+  gap: 14px 20px;
   align-items: center;
   border: 1px solid var(--border);
   background: var(--surface);
-  backdrop-filter: blur(12px);
   box-shadow: var(--shadow);
-  border-radius: 24px;
-  padding: 20px 24px;
-  margin-bottom: 24px;
+  border-radius: 12px;
+  padding: 16px 18px;
+  margin-bottom: 16px;
 }
 
 .document-meta h2 {
+  font-size: 1.15rem;
   margin-bottom: 6px;
 }
 
@@ -113,7 +107,7 @@ select {
 
 .document-actions {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
   justify-content: flex-end;
 }
@@ -126,32 +120,31 @@ select {
 .main-tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 24px;
+  gap: 6px;
+  margin-bottom: 16px;
 }
 
 .main-tab-button {
-  padding: 12px 20px;
-  border: 1px solid rgba(32, 48, 40, 0.16);
+  padding: 10px 16px;
+  border: 1px solid var(--border);
   background: var(--tab-idle);
-  color: #4f5b54;
-  border-radius: 14px;
+  color: #39424e;
+  border-radius: 10px;
   cursor: pointer;
-  font-size: 1rem;
+  font-size: 0.96rem;
   font-weight: 600;
-  transition: background 160ms ease, color 160ms ease, border-color 160ms ease, transform 160ms ease;
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
 }
 
 .main-tab-button:hover {
-  border-color: rgba(110, 50, 22, 0.28);
-  color: #24362d;
+  border-color: #b6c2cf;
+  color: #1f2328;
 }
 
 .main-tab-button.active {
   background: var(--tab-active);
-  color: #fff9f3;
-  border-color: rgba(110, 50, 22, 0.4);
-  transform: translateY(-1px);
+  color: var(--accent-strong);
+  border-color: #b6c7f5;
 }
 
 .main-tab-content {
@@ -164,10 +157,11 @@ select {
 
 .eyebrow {
   margin: 0 0 8px;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--accent-strong);
-  font-size: 0.78rem;
+  color: #57606a;
+  font-size: 0.75rem;
+  font-weight: 600;
 }
 
 h1,
@@ -178,14 +172,15 @@ p {
 }
 
 h1 {
-  margin-bottom: 12px;
-  font-size: clamp(2.6rem, 4vw, 4.3rem);
-  line-height: 0.95;
+  margin-bottom: 8px;
+  font-size: clamp(2.2rem, 3.6vw, 3rem);
+  line-height: 1.05;
 }
 
 .lede {
-  max-width: 54rem;
-  font-size: 1.08rem;
+  max-width: 58rem;
+  margin-bottom: 0;
+  font-size: 1rem;
   color: var(--muted);
 }
 
@@ -196,13 +191,12 @@ h1 {
 .summary-strip {
   border: 1px solid var(--border);
   background: var(--surface);
-  backdrop-filter: blur(12px);
   box-shadow: var(--shadow);
 }
 
 .hero-card {
-  padding: 22px;
-  border-radius: 24px;
+  padding: 18px;
+  border-radius: 12px;
   align-self: start;
 }
 
@@ -227,8 +221,8 @@ h1 {
 }
 
 .panel {
-  border-radius: 28px;
-  padding: 24px;
+  border-radius: 12px;
+  padding: 18px;
 }
 
 .w2-panel,
@@ -238,7 +232,7 @@ h1 {
 }
 
 .form-header {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .form-header p {
@@ -248,7 +242,7 @@ h1 {
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 12px;
 }
 
 label {
@@ -263,9 +257,9 @@ label span {
 input,
 select {
   width: 100%;
-  padding: 12px 14px;
-  border-radius: 14px;
-  border: 1px solid rgba(32, 48, 40, 0.18);
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
   background: var(--surface-strong);
   color: inherit;
 }
@@ -273,24 +267,24 @@ select {
 input:focus,
 select:focus,
 button:focus {
-  outline: 2px solid rgba(143, 77, 45, 0.35);
+  outline: 2px solid rgba(11, 87, 208, 0.25);
   outline-offset: 2px;
 }
 
 .actions {
-  margin-top: 24px;
+  margin-top: 18px;
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
 button {
-  border: 0;
-  border-radius: 999px;
-  padding: 12px 22px;
-  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
-  color: #fff9f3;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 10px 16px;
+  background: var(--accent);
+  color: #ffffff;
   cursor: pointer;
 }
 
@@ -300,35 +294,24 @@ button:disabled {
 }
 
 .secondary-button {
-  background: rgba(255, 253, 249, 0.8);
-  color: #2f3f36;
-  border: 1px solid rgba(32, 48, 40, 0.12);
+  background: #ffffff;
+  color: #1f2328;
+  border: 1px solid var(--border);
 }
 
 .secondary-button:hover:not(:disabled) {
-  border-color: rgba(110, 50, 22, 0.24);
-  color: #1f2f27;
-}
-
-.file-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  padding: 12px 22px;
-  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
-  color: #fff9f3;
-  cursor: pointer;
+  border-color: #b6c2cf;
+  color: #1f2328;
 }
 
 .danger-button {
-  background: rgba(143, 77, 45, 0.12);
-  color: var(--accent-strong);
-  border: 1px solid rgba(143, 77, 45, 0.18);
+  background: #ffffff;
+  color: #b42318;
+  border: 1px solid #f3b4af;
 }
 
 .danger-button:hover {
-  background: rgba(143, 77, 45, 0.18);
+  background: #fff5f4;
 }
 
 .microcopy,
@@ -359,17 +342,17 @@ button:disabled {
 
 .tabs {
   display: flex;
-  gap: 8px;
-  margin-bottom: 16px;
+  gap: 6px;
+  margin-bottom: 14px;
   flex-wrap: wrap;
 }
 
 .tab-button {
-  padding: 9px 16px;
-  border: 1px solid rgba(32, 48, 40, 0.16);
+  padding: 8px 12px;
+  border: 1px solid var(--border);
   background: var(--tab-idle);
   color: #536057;
-  border-radius: 12px;
+  border-radius: 8px;
   cursor: pointer;
   font-size: 0.9rem;
   font-weight: 600;
@@ -377,14 +360,14 @@ button:disabled {
 }
 
 .tab-button:hover {
-  border-color: rgba(110, 50, 22, 0.28);
-  color: #24362d;
+  border-color: #b6c2cf;
+  color: #1f2328;
 }
 
 .tab-button.active {
-  background: rgba(143, 77, 45, 0.14);
+  background: #e8f0fe;
   color: var(--accent-strong);
-  border-color: rgba(143, 77, 45, 0.32);
+  border-color: #b6c7f5;
 }
 
 .tab-content {
@@ -401,12 +384,27 @@ button:disabled {
   font-size: 0.9rem;
 }
 
+.b1099-table th:first-child,
+.b1099-table td:first-child {
+  width: 220px;
+  min-width: 220px;
+}
+
 .table-scroll {
   overflow-x: auto;
 }
 
 .wide-table {
-  min-width: 1080px;
+  min-width: 1400px;
+}
+
+.interest-table {
+  min-width: 0;
+  table-layout: fixed;
+}
+
+.dividends-table {
+  min-width: 2200px;
 }
 
 .b1099-table th,
@@ -416,18 +414,46 @@ button:disabled {
   border-bottom: 1px solid var(--border);
 }
 
+.b1099-table th:not(:first-child),
+.b1099-table td:not(:first-child) {
+  min-width: 130px;
+}
+
 .b1099-table th {
-  background: var(--surface-strong);
+  background: #f6f8fa;
   font-weight: 600;
+  white-space: normal;
+  line-height: 1.25;
+  vertical-align: bottom;
 }
 
 .b1099-table input {
   width: 100%;
-  min-width: 110px;
+  min-width: 96px;
   padding: 6px;
-  border: 1px solid rgba(32, 48, 40, 0.18);
+  border: 1px solid var(--border);
   background: var(--surface-strong);
-  border-radius: 4px;
+  border-radius: 6px;
+}
+
+.b1099-table td:first-child input {
+  min-width: 180px;
+}
+
+.interest-table th:first-child,
+.interest-table td:first-child {
+  width: 18%;
+  min-width: 160px;
+}
+
+.interest-table th:not(:first-child),
+.interest-table td:not(:first-child) {
+  min-width: 0;
+  width: 10.25%;
+}
+
+.interest-table input {
+  min-width: 0;
 }
 
 .b1099-table .calculated {
@@ -437,7 +463,7 @@ button:disabled {
 
 .b1099-table .sum {
   font-weight: 600;
-  background: var(--surface-strong);
+  background: #f6f8fa;
 }
 
 .empty-state-row td {
@@ -477,17 +503,19 @@ button:disabled {
 }
 
 .data-row.mismatch .calculated {
-  color: #d00;
+  color: #b54708;
+  background: #fff7ed;
 }
 
-.data-row.mismatch .gain-loss {
-  border-color: #d00;
+.data-row.mismatch input[data-field="gainLoss"] {
+  border-color: #f59e0b;
+  background: #fff7ed;
 }
 
 .b1099-panel,
 .accounts-panel {
-  max-width: 1000px;
-  margin: 0 auto;
+  max-width: 100%;
+  margin: 0;
 }
 
 .account-setup {
@@ -532,8 +560,8 @@ button:disabled {
 .empty-card {
   border: 1px solid var(--border);
   background: var(--surface-strong);
-  border-radius: 18px;
-  padding: 16px;
+  border-radius: 10px;
+  padding: 14px;
 }
 
 .w2-summary span {
@@ -556,8 +584,8 @@ button:disabled {
 .w2-card {
   border: 1px solid var(--border);
   background: var(--surface-strong);
-  border-radius: 22px;
-  padding: 20px;
+  border-radius: 12px;
+  padding: 16px;
 }
 
 .w2-card-header {
@@ -608,10 +636,23 @@ button:disabled {
   background: var(--surface-strong);
   border: 1px solid var(--border);
   border-radius: 8px;
+  gap: 16px;
 }
 
-.account-item span {
-  font-weight: 500;
+.account-item-fields {
+  display: grid;
+  grid-template-columns: 120px minmax(280px, 1fr);
+  gap: 12px;
+  flex: 1;
+}
+
+.account-item-fields label {
+  gap: 6px;
+}
+
+.account-item-fields span {
+  font-size: 0.8rem;
+  color: var(--muted);
 }
 
 .account-item button {
@@ -632,9 +673,9 @@ button:disabled {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
-  padding: 18px;
-  border-radius: 22px;
-  margin-bottom: 18px;
+  padding: 14px;
+  border-radius: 12px;
+  margin-bottom: 14px;
 }
 
 .summary-strip span,
@@ -653,13 +694,12 @@ button:disabled {
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
+  gap: 14px;
 }
 
 .metric-card {
-  padding: 18px;
-  border-radius: 22px;
-  animation: rise 300ms ease-out;
+  padding: 16px;
+  border-radius: 12px;
 }
 
 .wide-card {
@@ -669,7 +709,7 @@ button:disabled {
 .metric-card dl {
   margin: 0;
   display: grid;
-  gap: 14px;
+  gap: 12px;
 }
 
 .metric-card dl div {
@@ -691,9 +731,9 @@ button:disabled {
 }
 
 .assumptions {
-  margin-top: 18px;
-  padding: 18px;
-  border-radius: 22px;
+  margin-top: 14px;
+  padding: 16px;
+  border-radius: 12px;
 }
 
 @keyframes rise {
@@ -709,7 +749,6 @@ button:disabled {
 }
 
 @media (max-width: 1024px) {
-  .hero,
   .document-bar,
   .grid,
   .summary-strip,
@@ -726,13 +765,13 @@ button:disabled {
 @media (max-width: 720px) {
   .shell {
     width: min(100vw - 20px, 1280px);
-    padding-top: 20px;
+    padding-top: 16px;
   }
 
   .panel,
   .hero-card {
     padding: 18px;
-    border-radius: 22px;
+    border-radius: 12px;
   }
 
   .startup-card,
@@ -760,11 +799,19 @@ button:disabled {
     width: 100%;
   }
 
+  .account-item {
+    align-items: stretch;
+  }
+
+  .account-item-fields {
+    grid-template-columns: 1fr;
+  }
+
   .w2-card-header {
     display: grid;
   }
 
   h1 {
-    font-size: 2.4rem;
+    font-size: 2rem;
   }
 }
