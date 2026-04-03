@@ -57,6 +57,7 @@ type B1099Entry = {
   proceeds: number;
   costBasis: number;
   washSale: number;
+  includeWashSale: boolean;
   gainLoss: number;
 };
 
@@ -549,6 +550,7 @@ app.innerHTML = `
           <button type="button" class="tab-button" data-tab="short-noncovered">Short-Term Noncovered</button>
           <button type="button" class="tab-button" data-tab="long-covered">Long-Term Covered</button>
           <button type="button" class="tab-button" data-tab="long-noncovered">Long-Term Noncovered</button>
+          <button type="button" class="tab-button" data-tab="b1099-summary">Summary by Account</button>
         </div>
 
         <div id="short-covered-tab" class="tab-content active">
@@ -559,7 +561,7 @@ app.innerHTML = `
                   <th>Account Name</th>
                   <th>Total Proceeds</th>
                   <th>Total Cost Basis</th>
-                  <th>Wash Sale</th>
+                  <th>Wash Sale (Add?)</th>
                   <th>Reported Gain/Loss</th>
                   <th>Calculated Gain/Loss</th>
                 </tr>
@@ -589,7 +591,7 @@ app.innerHTML = `
                   <th>Account Name</th>
                   <th>Total Proceeds</th>
                   <th>Total Cost Basis</th>
-                  <th>Wash Sale</th>
+                  <th>Wash Sale (Add?)</th>
                   <th>Reported Gain/Loss</th>
                   <th>Calculated Gain/Loss</th>
                 </tr>
@@ -619,7 +621,7 @@ app.innerHTML = `
                   <th>Account Name</th>
                   <th>Total Proceeds</th>
                   <th>Total Cost Basis</th>
-                  <th>Wash Sale</th>
+                  <th>Wash Sale (Add?)</th>
                   <th>Reported Gain/Loss</th>
                   <th>Calculated Gain/Loss</th>
                 </tr>
@@ -649,7 +651,7 @@ app.innerHTML = `
                   <th>Account Name</th>
                   <th>Total Proceeds</th>
                   <th>Total Cost Basis</th>
-                  <th>Wash Sale</th>
+                  <th>Wash Sale (Add?)</th>
                   <th>Reported Gain/Loss</th>
                   <th>Calculated Gain/Loss</th>
                 </tr>
@@ -665,6 +667,34 @@ app.innerHTML = `
                   <td class="sum" id="long-noncovered-wash-sum">0.00</td>
                   <td class="sum" id="long-noncovered-gain-sum">0.00</td>
                   <td class="sum" id="long-noncovered-calculated-sum">0.00</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+
+        <div id="b1099-summary-tab" class="tab-content">
+          <div class="table-scroll">
+            <table class="b1099-table wide-table">
+              <thead>
+                <tr>
+                  <th>Account Name</th>
+                  <th>Total Proceeds</th>
+                  <th>Total Cost Basis</th>
+                  <th>Total Wash Sale</th>
+                  <th>Net Gain/Loss</th>
+                </tr>
+              </thead>
+              <tbody id="b1099-account-summary-rows">
+                <!-- Rows will be added dynamically -->
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td><strong>Total</strong></td>
+                  <td class="sum" id="b1099-account-summary-proceeds-sum">0.00</td>
+                  <td class="sum" id="b1099-account-summary-cost-sum">0.00</td>
+                  <td class="sum" id="b1099-account-summary-wash-sum">0.00</td>
+                  <td class="sum" id="b1099-account-summary-gain-sum">0.00</td>
                 </tr>
               </tfoot>
             </table>
@@ -740,6 +770,7 @@ const createEmptyB1099Entry = (): B1099Entry => ({
   proceeds: 0,
   costBasis: 0,
   washSale: 0,
+  includeWashSale: false,
   gainLoss: 0,
 });
 
@@ -848,6 +879,7 @@ function normalizeB1099Entry(value: unknown): B1099Entry {
     costBasis: readStoredNumber(entry.costBasis),
     washSale: readStoredNumber(entry.washSale),
     gainLoss: readStoredNumber(entry.gainLoss),
+    includeWashSale: typeof entry.includeWashSale === 'boolean' ? entry.includeWashSale : false,
   };
 }
 
@@ -1094,11 +1126,7 @@ function setTextContent(id: string, value: number) {
 }
 
 function calculateB1099Value(entry: B1099Entry): number {
-  return roundMoney(entry.proceeds - entry.costBasis + entry.washSale);
-}
-
-function calculateB1099ReportedValue(entry: B1099Entry): number {
-  return roundMoney(entry.proceeds - entry.costBasis);
+  return roundMoney(entry.proceeds - entry.costBasis + (entry.includeWashSale ? Math.abs(entry.washSale) : 0));
 }
 
 // Main tab switching
@@ -1675,7 +1703,7 @@ function updateB1099CategoryTotals(category: B1099Category) {
     proceeds += entry.proceeds;
     costBasis += entry.costBasis;
     washSale += entry.washSale;
-    gainLoss += calculateB1099ReportedValue(entry);
+    gainLoss += entry.gainLoss;
     calculatedGainLoss += calculateB1099Value(entry);
   });
 
@@ -1829,13 +1857,9 @@ function renderMiscRows() {
 }
 
 function applyB1099RowState(row: HTMLTableRowElement, entry: B1099Entry) {
-  const reportedValue = calculateB1099ReportedValue(entry);
+  const reportedValue = entry.gainLoss;
   const calculatedValue = calculateB1099Value(entry);
   const calculatedCell = row.querySelector<HTMLElement>('.calculated');
-  const reportedInput = row.querySelector<HTMLInputElement>('input[data-field="gainLoss"]');
-  if (reportedInput) {
-    reportedInput.value = formatInputValue(reportedValue);
-  }
   if (calculatedCell) {
     calculatedCell.textContent = calculatedValue.toFixed(2);
   }
@@ -1861,25 +1885,36 @@ function renderB1099Rows(category: B1099Category) {
 
   getSortedAccounts().forEach((account) => {
     const entry = getAccountDetails(account.id).b1099[category];
-    entry.gainLoss = calculateB1099ReportedValue(entry);
     const row = document.createElement('tr');
     row.className = 'data-row';
     row.innerHTML = `
       <td><input type="text" value="${account.name}" readonly /></td>
       <td><input type="number" step="0.01" data-field="proceeds" value="${formatInputValue(entry.proceeds)}" /></td>
       <td><input type="number" step="0.01" data-field="costBasis" value="${formatInputValue(entry.costBasis)}" /></td>
-      <td><input type="number" step="0.01" data-field="washSale" value="${formatInputValue(entry.washSale)}" /></td>
-      <td><input type="number" step="0.01" data-field="gainLoss" value="${formatInputValue(entry.gainLoss)}" readonly /></td>
+      <td>
+        <div style="display: flex; align-items: center; gap: 4px;">
+          <input type="checkbox" data-checkbox-field="includeWashSale" ${entry.includeWashSale ? 'checked' : ''} title="Include Wash Sale in Calculation?" style="margin:0; cursor:pointer;" />
+          <input type="number" step="0.01" data-field="washSale" value="${formatInputValue(entry.washSale)}" style="flex: 1;" />
+        </div>
+      </td>
+      <td><input type="number" step="0.01" data-field="gainLoss" value="${formatInputValue(entry.gainLoss)}" /></td>
       <td class="calculated">0.00</td>
     `;
 
     row.querySelectorAll<HTMLInputElement>('input[data-field]').forEach((input) => {
       input.addEventListener('input', () => {
         const field = input.dataset.field as keyof B1099Entry;
-        if (field !== 'gainLoss') {
-          getAccountDetails(account.id).b1099[category][field] = readStoredNumber(input.value);
-          getAccountDetails(account.id).b1099[category].gainLoss = calculateB1099ReportedValue(getAccountDetails(account.id).b1099[category]);
-        }
+        (getAccountDetails(account.id).b1099[category][field] as number) = readStoredNumber(input.value);
+        applyB1099RowState(row, getAccountDetails(account.id).b1099[category]);
+        updateB1099SummaryInputs();
+        markDirty();
+      });
+    });
+
+    row.querySelectorAll<HTMLInputElement>('input[data-checkbox-field]').forEach((input) => {
+      input.addEventListener('change', () => {
+        const field = input.dataset.checkboxField as keyof B1099Entry;
+        (getAccountDetails(account.id).b1099[category][field] as boolean) = input.checked;
         applyB1099RowState(row, getAccountDetails(account.id).b1099[category]);
         updateB1099SummaryInputs();
         markDirty();
