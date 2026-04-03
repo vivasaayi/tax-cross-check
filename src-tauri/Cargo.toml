@@ -1,0 +1,18 @@
+[package]
+name = "taxes"
+version = "0.1.0"
+description = "Summary tax cross-check desktop app"
+authors = ["GitHub Copilot"]
+edition = "2021"
+
+[lib]
+name = "taxes"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.0.1", features = [] }
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tauri = { version = "2.0.2", features = [] }
