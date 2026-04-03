@@ -14,6 +14,8 @@
   --shadow: 0 18px 40px rgba(52, 52, 35, 0.1);
   --accent: #8f4d2d;
   --accent-strong: #6e3216;
+  --tab-idle: rgba(255, 252, 246, 0.94);
+  --tab-active: linear-gradient(135deg, #9b5734 0%, #6e3216 100%);
   --muted: #5b665f;
 }
 
@@ -45,6 +47,45 @@ select {
   gap: 24px;
   margin-bottom: 24px;
   animation: rise 420ms ease-out;
+}
+
+.main-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.main-tab-button {
+  padding: 12px 20px;
+  border: 1px solid rgba(32, 48, 40, 0.16);
+  background: var(--tab-idle);
+  color: #4f5b54;
+  border-radius: 14px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+.main-tab-button:hover {
+  border-color: rgba(110, 50, 22, 0.28);
+  color: #24362d;
+}
+
+.main-tab-button.active {
+  background: var(--tab-active);
+  color: #fff9f3;
+  border-color: rgba(110, 50, 22, 0.4);
+  transform: translateY(-1px);
+}
+
+.main-tab-content {
+  display: none;
+}
+
+.main-tab-content.active {
+  display: block;
 }
 
 .eyebrow {
@@ -201,22 +242,32 @@ button {
 
 .tabs {
   display: flex;
-  gap: 4px;
+  gap: 8px;
   margin-bottom: 16px;
+  flex-wrap: wrap;
 }
 
 .tab-button {
-  padding: 8px 16px;
-  border: 1px solid var(--border);
-  background: var(--surface-strong);
-  border-radius: 8px 8px 0 0;
+  padding: 9px 16px;
+  border: 1px solid rgba(32, 48, 40, 0.16);
+  background: var(--tab-idle);
+  color: #536057;
+  border-radius: 12px;
   cursor: pointer;
   font-size: 0.9rem;
+  font-weight: 600;
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+
+.tab-button:hover {
+  border-color: rgba(110, 50, 22, 0.28);
+  color: #24362d;
 }
 
 .tab-button.active {
-  background: var(--surface);
-  border-bottom-color: var(--surface);
+  background: rgba(143, 77, 45, 0.14);
+  color: var(--accent-strong);
+  border-color: rgba(143, 77, 45, 0.32);
 }
 
 .tab-content {
@@ -233,6 +284,14 @@ button {
   font-size: 0.9rem;
 }
 
+.table-scroll {
+  overflow-x: auto;
+}
+
+.wide-table {
+  min-width: 1080px;
+}
+
 .b1099-table th,
 .b1099-table td {
   padding: 8px;
@@ -247,6 +306,7 @@ button {
 
 .b1099-table input {
   width: 100%;
+  min-width: 110px;
   padding: 6px;
   border: 1px solid rgba(32, 48, 40, 0.18);
   background: var(--surface-strong);
@@ -261,6 +321,13 @@ button {
 .b1099-table .sum {
   font-weight: 600;
   background: var(--surface-strong);
+}
+
+.empty-state-row td {
+  padding: 18px 12px;
+  color: var(--muted);
+  text-align: center;
+  font-style: italic;
 }
 
 .remove-row {
@@ -298,6 +365,77 @@ button {
 
 .data-row.mismatch .gain-loss {
   border-color: #d00;
+}
+
+.b1099-panel,
+.accounts-panel {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.account-setup {
+  margin-top: 20px;
+}
+
+.add-account {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.add-account input {
+  flex: 1;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-strong);
+}
+
+.add-account button {
+  padding: 10px 16px;
+  background: var(--accent);
+  color: #fff9f3;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.add-account button:hover {
+  background: var(--accent-strong);
+}
+
+.accounts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.account-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.account-item span {
+  font-weight: 500;
+}
+
+.account-item button {
+  background: none;
+  border: none;
+  color: #d00;
+  cursor: pointer;
+  font-size: 1.2rem;
+  padding: 4px;
+}
+
+.account-item button:hover {
+  background: rgba(221, 0, 0, 0.1);
+  border-radius: 4px;
 }
 
 .summary-strip {

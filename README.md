@@ -1,19 +1,37 @@
 # Tax Cross Check
 
-A small Rust and Tauri desktop app to cross-check summary tax numbers against TurboTax for:
+A small Rust and Tauri desktop app to cross-check summary tax numbers against TurboTax for federal tax and NJ or NY returns.
 
-- Federal tax
-- New Jersey resident return estimate
-- New York resident return estimate
-- Tax years 2024 and 2025
+## Features
 
-This app is intentionally not a full filing product. It focuses on summary inputs from common forms:
+- **Tax Calculator Tab**: Clean interface for main tax inputs and results
+- **Accounts Tab**: Central management of trading account names
+- **Interest Tab**: Account-level 1099-INT detail across common boxes, including taxable, treasury, tax-exempt, and premium-related fields
+- **Dividends Tab**: Account-level 1099-DIV detail across ordinary, qualified, capital gain, 199A, exempt-interest, and related fields
+- **Misc Income Tab**: Account-level breakdown of 1099-MISC income
+- **1099-B Details Tab**: Separate covered and noncovered tables for short-term and long-term capital gains/losses
+- **Automatic Calculation**: Gain/Loss verification (Proceeds - Cost Basis - Wash Sale)
+- **Column Summing**: Real-time totals for all account data
+- **Mismatch Highlighting**: Visual alerts when your input doesn't match calculated values
+
+## Supported Forms
 
 - W-2 wages
-- 1099-INT taxable interest
-- 1099-DIV ordinary and qualified dividends
-- 1099-MISC income
-- 1099-B short-term and long-term gains or losses
+- 1099-INT common box detail (account-level)
+- 1099-DIV common box detail (account-level)
+- 1099-MISC income (account-level)
+- 1099-B short-term covered
+- 1099-B short-term noncovered
+- 1099-B long-term covered
+- 1099-B long-term noncovered
+
+## Workflow
+
+1. **Setup Accounts**: Go to "Accounts" tab and add your trading account names
+2. **Enter Income Details**: Use the "Interest", "Dividends", and "Misc Income" tabs to enter account-level box data
+3. **Enter Trading Details**: Switch to "1099-B Details" and fill in the four covered/noncovered tables for each account
+4. **Verify Calculations**: Check that calculated Gain/Loss matches your Excel numbers
+5. **Calculate Tax**: Go to "Tax Calculator" tab for the final tax estimate
 
 ## Scope
 
